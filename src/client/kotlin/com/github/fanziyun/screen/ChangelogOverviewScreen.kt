@@ -1,11 +1,11 @@
-package com.github.fanziyun.screen
+﻿package com.github.fanziyun.screen
 
 import com.github.fanziyun.client.ChangelogClient
 import com.github.fanziyun.data.ChangelogEntry
 import com.github.fanziyun.data.ChangelogLoader
 import com.github.fanziyun.data.VersionChecker
 import com.github.fanziyun.util.ColorUtil
-import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.Tooltip
 import net.minecraft.client.gui.screens.ConfirmLinkScreen
@@ -48,7 +48,7 @@ class ChangelogOverviewScreen(parent: Screen?) : Screen(Component.translatable("
         if (hasLink) {
             addRenderableWidget(
                 Button.builder(Component.literal(cfg.externalLinkName)) {
-                    ConfirmLinkScreen.confirmLinkNow(this, URI.create(cfg.externalLinkUrl))
+                    ConfirmLinkScreen.confirmLink(this, URI.create(cfg.externalLinkUrl))
                 }.bounds(btnLeft, height - 30, linkWidth, 20).build()
             )
         }
@@ -71,22 +71,22 @@ class ChangelogOverviewScreen(parent: Screen?) : Screen(Component.translatable("
         )
     }
 
-    override fun extractRenderState(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick)
+    override fun render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
+        super.render(graphics, mouseX, mouseY, partialTick)
 
         smoothScroll += (targetScroll - smoothScroll) * 0.25f
         if (kotlin.math.abs(smoothScroll - targetScroll) < 0.5f) smoothScroll = targetScroll.toFloat()
 
         val titleText = title.string
-        graphics.text(font, titleText, width / 2 - font.width(titleText) / 2, 20, 0xFFFFFF)
+        graphics.drawString(font, titleText, width / 2 - font.width(titleText) / 2, 20, 0xFFFFFF)
 
         val stats = Component.translatable("screen.changelog363.stats", ChangelogLoader.data.entriesOrEmpty.size).string
-        graphics.text(font, stats, 20, 35, 0xFFAAAAAA.toInt())
+        graphics.drawString(font, stats, 20, 35, 0xFFAAAAAA.toInt())
 
         val config = ChangelogClient.config
         if (config?.enableVersionCheck == true && VersionChecker.isDone && VersionChecker.hasUpdate) {
             val updateText = "新版本: ${VersionChecker.latestVersion}"
-            graphics.text(font, updateText, 20 + font.width(stats) + 4, 35, 0xFF_FF_FF_55.toInt())
+            graphics.drawString(font, updateText, 20 + font.width(stats) + 4, 35, 0xFF_FF_FF_55.toInt())
         }
 
         graphics.enableScissor(listLeft, listTop, listRight, listBottom)
@@ -108,7 +108,7 @@ class ChangelogOverviewScreen(parent: Screen?) : Screen(Component.translatable("
         renderScrollbar(graphics)
     }
 
-private fun renderEntry(graphics: GuiGraphicsExtractor, entry: ChangelogEntry, top: Int): Int {
+    private fun renderEntry(graphics: GuiGraphics, entry: ChangelogEntry, top: Int): Int {
         var y = top
         graphics.fill(20, y + 1, listRight, y + slotHeight - 1, 0x1AFFFFFF)
         graphics.fill(20, y, 24, y + slotHeight, entry.parsedColor)
@@ -116,40 +116,40 @@ private fun renderEntry(graphics: GuiGraphicsExtractor, entry: ChangelogEntry, t
         val icon = ColorUtil.getTypeIcon(entry.primaryType)
         val typeColor = ColorUtil.getTypeColor(entry.primaryType)
         val versionText = "$icon ${entry.versionOrEmpty}"
-        graphics.text(font, versionText, 32, y + 4, typeColor)
+        graphics.drawString(font, versionText, 32, y + 4, typeColor)
 
         var tagX = 32 + font.width(versionText) + 6
         for (tag in entry.typeOrEmpty) {
             val tagName = ColorUtil.getTypeDisplayName(tag)
             val tagW = font.width(tagName) + 6
             graphics.fill(tagX, y + 3, tagX + tagW, y + 13, ColorUtil.getTypeColor(tag))
-            graphics.text(font, tagName, tagX + 3, y + 4, if (ColorUtil.isBright(ColorUtil.getTypeColor(tag))) 0xFF000000.toInt() else 0xFFFFFFFF.toInt())
+            graphics.drawString(font, tagName, tagX + 3, y + 4, if (ColorUtil.isBright(ColorUtil.getTypeColor(tag))) 0xFF000000.toInt() else 0xFFFFFFFF.toInt())
             tagX += tagW + 4
         }
 
         if (entry.dateOrEmpty.isNotBlank()) {
-            graphics.text(font, entry.dateOrEmpty, listRight - font.width(entry.dateOrEmpty), y + 4, 0xFFAAAAAA.toInt())
+            graphics.drawString(font, entry.dateOrEmpty, listRight - font.width(entry.dateOrEmpty), y + 4, 0xFFAAAAAA.toInt())
         }
         if (entry.titleOrEmpty.isNotBlank()) {
-            graphics.text(font, entry.titleOrEmpty, 32, y + 18, 0xFFDDDDDD.toInt())
+            graphics.drawString(font, entry.titleOrEmpty, 32, y + 18, 0xFFDDDDDD.toInt())
         }
         if (entry.changesOrEmpty.isNotEmpty()) {
-            graphics.text(font, "• ${entry.changesOrEmpty.first().take(45)}", 32, y + 34, 0xFFAAAAAA.toInt())
+            graphics.drawString(font, "• ${entry.changesOrEmpty.first().take(45)}", 32, y + 34, 0xFFAAAAAA.toInt())
         }
 
         y += slotHeight
         return y
     }
 
-    override fun mouseClicked(event: net.minecraft.client.input.MouseButtonEvent, doubleClick: Boolean): Boolean {
-        if (event.button() == 0) {
-            val idx = hitTestEntry(event.y.toInt())
+    override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
+        if (button == 0) {
+            val idx = hitTestEntry(mouseY.toInt())
             if (idx >= 0) {
                 minecraft.setScreen(ChangelogDetailScreen(ChangelogLoader.data.entriesOrEmpty[idx], this))
                 return true
             }
         }
-        return super.mouseClicked(event, doubleClick)
+        return super.mouseClicked(mouseX, mouseY, button)
     }
 
     override fun mouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean {
@@ -163,13 +163,13 @@ private fun renderEntry(graphics: GuiGraphicsExtractor, entry: ChangelogEntry, t
     }
 
     private fun hitTestEntry(mouseY: Int): Int {
-        if (mouseY !in listTop..<listBottom) return -1
+        if (mouseY !in listTop until listBottom) return -1
         val entryIndex = (mouseY - listTop + scrollOffset) / slotHeight
         if (entryIndex < 0 || entryIndex >= ChangelogLoader.data.entriesOrEmpty.size) return -1
         return entryIndex
     }
 
-    private fun renderScrollbar(graphics: GuiGraphicsExtractor) {
+    private fun renderScrollbar(graphics: GuiGraphics) {
         if (maxScroll <= 0) return
         val barHeight = (visibleHeight.toFloat() / totalContentHeight * visibleHeight).toInt().coerceAtLeast(10)
         val barY = listTop + ((smoothScroll / maxScroll) * (visibleHeight - barHeight)).toInt()

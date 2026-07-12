@@ -1,11 +1,11 @@
-package com.github.fanziyun.mixin
+﻿package com.github.fanziyun.mixin
 
 import com.github.fanziyun.client.ChangelogClient
 import com.github.fanziyun.data.ChangelogLoader
 import com.github.fanziyun.data.VersionChecker
 import com.github.fanziyun.screen.ChangelogOverviewScreen
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen
@@ -52,8 +52,8 @@ abstract class TitleScreenMixin : Screen(Component.literal("")) {
         if (VersionChecker.isDone) hasUpdate = VersionChecker.hasUpdate
     }
 
-    @Inject(method = ["extractRenderState"], at = [At("TAIL")])
-    fun onRender(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float, callback: CallbackInfo) {
+    @Inject(method = ["render"], at = [At("TAIL")])
+    fun onRender(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float, callback: CallbackInfo) {
         val config = ChangelogClient.config ?: return
         val packName = config.packName.ifBlank { null }
         val versionPart = "v${config.modpackVersion}"
@@ -65,14 +65,14 @@ abstract class TitleScreenMixin : Screen(Component.literal("")) {
             append(versionPart)
         }
         val prefixWidth = font.width(prefix)
-        graphics.text(font, prefix, 2, lineY, white)
+        graphics.drawString(font, prefix, 2, lineY, white)
 
         if (hasUpdate && VersionChecker.latestVersion.isNotBlank()) {
-            val status = " (新版本: v${VersionChecker.latestVersion})"
-            graphics.text(font, status, 2 + prefixWidth, lineY, 0xFF_FF_FF_55.toInt())
+            val status = " (新版本 v${VersionChecker.latestVersion})"
+            graphics.drawString(font, status, 2 + prefixWidth, lineY, 0xFF_FF_FF_55.toInt())
         } else {
             val status = " (已是最新版本)"
-            graphics.text(font, status, 2 + prefixWidth, lineY, 0xFF_55_FF_55.toInt())
+            graphics.drawString(font, status, 2 + prefixWidth, lineY, 0xFF_55_FF_55.toInt())
         }
     }
 }

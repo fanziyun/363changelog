@@ -1,9 +1,9 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+﻿import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "2.3.21"
-    id("net.fabricmc.fabric-loom") version "1.16-SNAPSHOT"
+    id("fabric-loom") version "1.5.8"
     id("maven-publish")
 }
 
@@ -14,18 +14,19 @@ base {
     archivesName.set(project.property("archives_base_name") as String)
 }
 
-val targetJavaVersion = 25
+val targetJavaVersion = 17
 java {
     toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
-    // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
-    // if it is present.
-    // If you remove this line, sources will not be generated.
     withSourcesJar()
 }
 
-loom {
-    splitEnvironmentSourceSets()
+// Define client source set manually (Loom 1.5.x compat without splitEnvironmentSourceSets)
+val client by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
+    runtimeClasspath += sourceSets.main.get().output + sourceSets.main.get().runtimeClasspath
+}
 
+loom {
     mods {
         register("changelog363") {
             sourceSet("main")
@@ -44,14 +45,16 @@ repositories {
     maven("https://maven.terraformersmc.com/releases/") {
         name = "Mod Menu"
     }
+    maven("https://api.modrinth.com/maven") {
+        name = "Modrinth"
+    }
     mavenCentral()
 }
 
 dependencies {
-    // To change the versions see the gradle.properties file
     minecraft("com.mojang:minecraft:${project.property("minecraft_version")}")
+    mappings("net.fabricmc:yarn:1.20.1+build.9")
 
-    // 共享依赖 (main + client 都能使用)
     val sharedDeps = listOf(
         "net.fabricmc:fabric-loader:${project.property("loader_version")}",
         "net.fabricmc:fabric-language-kotlin:${project.property("kotlin_loader_version")}",
@@ -64,13 +67,11 @@ dependencies {
         add("clientImplementation", dep)
     }
 
-    // Cloth Config (配置界面)
     val clothConfig = "me.shedaniel.cloth:cloth-config-fabric:${project.property("cloth_config_version")}"
     implementation(clothConfig) { exclude(group = "net.fabricmc.fabric-api") }
     add("clientImplementation", clothConfig) { exclude(group = "net.fabricmc.fabric-api") }
 
-    // Mod Menu
-    val modMenu = "com.terraformersmc:modmenu:${project.property("modmenu_version")}"
+    val modMenu = "maven.modrinth:modmenu:${project.property("modmenu_version")}"
     implementation(modMenu)
     add("clientImplementation", modMenu)
 }
@@ -92,10 +93,6 @@ tasks.processResources {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    // ensure that the encoding is set to UTF-8, no matter what the system default is
-    // this fixes some edge cases with special characters not displaying correctly
-    // see http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
-    // If Javadoc is generated, this must be specified in that task too.
     options.encoding = "UTF-8"
     options.release.set(targetJavaVersion)
 }
@@ -110,7 +107,6 @@ tasks.jar {
     }
 }
 
-// configure the maven publication
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
@@ -119,8 +115,6 @@ publishing {
         }
     }
 
-    // See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
     repositories {
-        // Add repositories to publish to here.
     }
 }
