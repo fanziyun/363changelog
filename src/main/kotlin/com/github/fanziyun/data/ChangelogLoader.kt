@@ -38,7 +38,7 @@ object ChangelogLoader {
         get() = data.entriesOrEmpty.firstOrNull()?.versionOrEmpty ?: ""
 
     private val loading = AtomicBoolean(false)
-    private var cachedEtag: String = ""
+    private var cachedEtag: String = loadCachedEtag()
 
     fun load(remoteUrl: String, forceRefresh: Boolean = false): CompletableFuture<Boolean> {
         if (!loading.compareAndSet(false, true)) {
@@ -89,7 +89,7 @@ object ChangelogLoader {
             conn.setRequestProperty("User-Agent", "363Changelog/1.0")
 
             if (!forceRefresh && cachedEtag.isNotBlank()) {
-                conn.setRequestProperty("If-None-Match", "\"$cachedEtag\"")
+                conn.setRequestProperty("If-None-Match", cachedEtag)
             }
 
             val responseCode = conn.responseCode
@@ -100,8 +100,8 @@ object ChangelogLoader {
 
             if (responseCode != HttpURLConnection.HTTP_OK) return false
 
-            conn.headerFields["ETag"]?.firstOrNull()?.let { etag ->
-                cachedEtag = etag.replace("\"", "").replace("W/", "").trim()
+            conn.headerFields["ETag"]?.firstOrNull()?.trim()?.let { etag ->
+                cachedEtag = etag
             }
 
             val data = conn.inputStream.use { stream ->
@@ -141,6 +141,7 @@ object ChangelogLoader {
             if (Files.exists(cacheFile)) {
                 val data = parseJson(Files.readAllBytes(cacheFile)) ?: return false
                 _data.set(data)
+                loadCachedEtag().takeIf { it.isNotBlank() }?.let { cachedEtag = it }
                 Changelog.LOGGER.info("Changelog loaded from cache")
                 true
             } else false
@@ -160,6 +161,19 @@ object ChangelogLoader {
             }
         } catch (e: Exception) {
             Changelog.LOGGER.warn("Failed to write changelog cache", e)
+        }
+    }
+
+    private fun loadCachedEtag(): String {
+        return try {
+            val etagFile = cacheDir.resolve("changelog_cache.etag")
+            if (Files.exists(etagFile)) {
+                Files.readString(etagFile, StandardCharsets.UTF_8).trim()
+            } else {
+                ""
+            }
+        } catch (_: Exception) {
+            ""
         }
     }
 
