@@ -100,7 +100,7 @@ class ChangelogDetailScreen(
     }
 
     override fun onClose() {
-        minecraft.setScreen(parentScreen)
+        minecraft.gui.setScreen(parentScreen)
     }
 
     override fun isPauseScreen() = false

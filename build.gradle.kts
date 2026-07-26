@@ -2,11 +2,11 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "2.3.21" apply false
+    kotlin("jvm") version "2.4.10" apply false
     // see https://fabricmc.net/develop/ for new versions
-    id("net.fabricmc.fabric-loom") version "1.15.5" apply false
+    id("net.fabricmc.fabric-loom") version "1.17.17" apply false
     // see https://projects.neoforged.net/neoforged/moddevgradle for new versions
-    id("net.neoforged.moddev") version "2.0.141" apply false
+    id("net.neoforged.moddev") version "2.0.142" apply false
 }
 
 val javaVersion = (property("java_version") as String).toInt()

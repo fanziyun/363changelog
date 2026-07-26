@@ -235,7 +235,7 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
         if (event.button() == 0) {
             val index = entryIndexAt(event.x.toInt(), event.y.toInt())
             if (index >= 0) {
-                minecraft.setScreen(ChangelogDetailScreen(rows[index].entry, this))
+                minecraft.gui.setScreen(ChangelogDetailScreen(rows[index].entry, this))
                 return true
             }
         }
@@ -261,7 +261,7 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
     }
 
     override fun onClose() {
-        minecraft.setScreen(parentScreen)
+        minecraft.gui.setScreen(parentScreen)
     }
 
     override fun isPauseScreen() = false

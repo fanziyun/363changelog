@@ -15,6 +15,15 @@ interface Platform {
     /** 游戏根目录，更新日志的磁盘缓存放在它下面的 `.cache/` 里 */
     val gameDir: Path
 
+    /**
+     * 加载器在标题界面左下角画了几行版本信息。
+     *
+     * 原版只画一行"Minecraft <版本>"；NeoForge 用自己的 branding 覆盖掉那行，
+     * 通常是两行（Minecraft 一行、NeoForge + 模组数一行），而且是自下而上堆的。
+     * 我们的整合包版本行要排在这些行之上，否则会和它们叠在一起。
+     */
+    val titleScreenBrandingLines: Int
+
     companion object {
         val INSTANCE: Platform by lazy {
             // 必须显式传 classloader。ServiceLoader.load(Class) 用的是线程上下文类加载器，

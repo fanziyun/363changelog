@@ -39,7 +39,9 @@ abstract class PauseScreenMixin : Screen(Component.literal("")) {
             ?: return
         addRenderableWidget(
             Button.builder(Component.translatable("menu.changelog363.button")) {
-                Minecraft.getInstance().setScreen(ChangelogOverviewScreen(Minecraft.getInstance().screen))
+                // 26.2 把 setScreen / screen 从 Minecraft 挪到了 Gui 上
+                val gui = Minecraft.getInstance().gui
+                gui.setScreen(ChangelogOverviewScreen(gui.screen()))
             }.bounds(left, buttonY, BUTTON_WIDTH, ButtonPlacement.BUTTON_HEIGHT).build()
         )
     }

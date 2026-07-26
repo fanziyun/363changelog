@@ -1,7 +1,7 @@
 # 363Changelog
 
 一个 Minecraft 模组，在主菜单与暂停界面展示整合包更新日志，支持远程获取与版本检测。
-**同时支持 Fabric 与 NeoForge**（Minecraft 26.1.2）。
+**同时支持 Fabric 与 NeoForge**（Minecraft 26.2）。
 
 ## 安装 / Installation
 
@@ -28,7 +28,7 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `externalLinkName` | String | `"项目主页"` | 外部链接按钮的显示名称。留空则不显示该按钮。 |
 | `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | 外部链接按钮的目标 URL。 |
 
-`changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/26.1.2/common/src/main/resources/changelog.json`
+`changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/26.2/common/src/main/resources/changelog.json`
 
 数据来源按 **远程 URL → 本地缓存 → 模组内置 changelog.json** 的顺序回退，任一环节成功即停止；
 远程请求会带 `If-None-Match`，命中 304 时直接复用本地缓存。
@@ -186,15 +186,20 @@ Mixin 也放在 `common`：Fabric 与 NeoForge 都内置 Fabric Mixin，
 
 | 组件 | 版本 |
 |------|------|
-| Minecraft | 26.1.2 |
-| Fabric Loom / ModDevGradle | 1.15.5 / 2.0.141 |
-| NeoForm（common 用） | 26.1.2-1 |
-| NeoForge | 26.1.2.87 |
-| Kotlin | 2.3.21 |
+| Minecraft | 26.2 |
+| Fabric Loom / ModDevGradle | 1.17.17 / 2.0.142 |
+| NeoForm（common 用） | 26.2-2 |
+| NeoForge | 26.2.0.32-beta |
+| Kotlin | 2.4.10 |
 
-> Kotlin for Forge 6.2.0 内置的 Kotlin 标准库是 **2.3.10**，而本项目用 2.3.21 编译。
+> NeoForge 26.2 系列目前只有 beta 构建，正式版发布后需要同步 `neoforge_version`。
+
+> Kotlin for Forge 6.3.0 内置的 Kotlin 标准库是 **2.4.0**，而本项目用 2.4.10 编译。
 > 同一 minor 内标准库 API 兼容，本模组也只用了长期稳定的 API，所以没问题；
-> 但如果将来用到 2.3.11+ 才引入的标准库 API，就需要换用绑定了对应版本的语言提供者。
+> 但如果将来用到 2.4.1+ 才引入的标准库 API，就需要换用绑定了对应版本的语言提供者。
+> 升级 Kotlin 时务必一并检查 Kotlin for Forge —— 它在 NeoForge 运行时提供标准库，
+> 跨 minor 不匹配（例如 2.4 编译、运行时只有 2.3）会在玩家端炸，而开发环境里
+> Gradle 会把它升到编译版本，问题不会暴露。
 
 ### Changelog 编辑器
 
