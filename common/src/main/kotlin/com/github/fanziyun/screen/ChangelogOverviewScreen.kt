@@ -5,12 +5,11 @@ import com.github.fanziyun.data.ChangelogEntry
 import com.github.fanziyun.data.ChangelogLoader
 import com.github.fanziyun.data.VersionChecker
 import com.github.fanziyun.util.ColorUtil
-import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.Tooltip
 import net.minecraft.client.gui.screens.ConfirmLinkScreen
 import net.minecraft.client.gui.screens.Screen
-import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.network.chat.Component
 import java.net.URI
 import kotlin.math.abs
@@ -109,7 +108,7 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
         addRenderableWidget(
             Button.builder(Component.translatable("screen.changelog363.refresh")) {
                 ChangelogService.ensureChangelogLoaded(forceRefresh = true)
-                    .thenRun { minecraft.execute(::rebuildRows) }
+                    .thenRun { minecraft?.execute(::rebuildRows) }
             }
                 .bounds(width - 100, 10, 90, 20)
                 .tooltip(Tooltip.create(Component.translatable("screen.changelog363.refresh.tooltip")))
@@ -162,8 +161,8 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
         clampScroll()
     }
 
-    override fun extractRenderState(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick)
+    override fun render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
+        super.render(graphics, mouseX, mouseY, partialTick)
 
         clampScroll()
         smoothScroll += (targetScroll - smoothScroll) * SCROLL_SMOOTHING
@@ -172,16 +171,16 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
         hoveredIndex = entryIndexAt(mouseX, mouseY)
 
         val titleText = title.string
-        graphics.text(font, titleText, (width - font.width(titleText)) / 2, 20, ColorUtil.WHITE)
+        graphics.drawString(font, titleText, (width - font.width(titleText)) / 2, 20, ColorUtil.WHITE)
 
         val stats = Component.translatable("screen.changelog363.stats", rows.size).string
-        graphics.text(font, stats, LIST_LEFT, 35, ColorUtil.GREY)
+        graphics.drawString(font, stats, LIST_LEFT, 35, ColorUtil.GREY)
 
         if (ChangelogService.config?.enableVersionCheck == true && VersionChecker.isDone && VersionChecker.hasUpdate) {
             val update = Component.translatable(
                 "screen.changelog363.update_available", VersionChecker.latestVersion
             ).string
-            graphics.text(font, update, LIST_LEFT + font.width(stats) + 6, 35, ColorUtil.YELLOW)
+            graphics.drawString(font, update, LIST_LEFT + font.width(stats) + 6, 35, ColorUtil.YELLOW)
         }
 
         graphics.enableScissor(LIST_LEFT, LIST_TOP, listRight, listBottom)
@@ -198,7 +197,7 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
         renderScrollbar(graphics)
     }
 
-    private fun renderRow(graphics: GuiGraphicsExtractor, row: Row, top: Int, hovered: Boolean) {
+    private fun renderRow(graphics: GuiGraphics, row: Row, top: Int, hovered: Boolean) {
         graphics.fill(
             LIST_LEFT, top + 1, listRight, top + SLOT_HEIGHT - 1,
             if (hovered) ROW_HOVERED else ROW_BACKGROUND
@@ -206,23 +205,23 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
         // 与磁贴背景保持同一垂直范围，否则色条上下各多出 1px，行与行之间会露出色带
         graphics.fill(LIST_LEFT, top + 1, LIST_LEFT + 4, top + SLOT_HEIGHT - 1, row.entry.color)
 
-        graphics.text(font, row.versionText, TEXT_LEFT, top + 4, row.versionColor)
+        graphics.drawString(font, row.versionText, TEXT_LEFT, top + 4, row.versionColor)
 
         var badgeX = row.badgeX
         for (badge in row.badges) badgeX = graphics.drawBadge(font, badge, badgeX, top + 3)
 
         if (row.date.isNotBlank()) {
-            graphics.text(font, row.date, row.dateX, top + 4, ColorUtil.GREY)
+            graphics.drawString(font, row.date, row.dateX, top + 4, ColorUtil.GREY)
         }
         if (row.title.isNotBlank()) {
-            graphics.text(font, row.title, TEXT_LEFT, top + 18, ColorUtil.LIGHT_GREY)
+            graphics.drawString(font, row.title, TEXT_LEFT, top + 18, ColorUtil.LIGHT_GREY)
         }
         if (row.summary.isNotBlank()) {
-            graphics.text(font, row.summary, TEXT_LEFT, top + 34, ColorUtil.GREY)
+            graphics.drawString(font, row.summary, TEXT_LEFT, top + 34, ColorUtil.GREY)
         }
     }
 
-    private fun renderScrollbar(graphics: GuiGraphicsExtractor) {
+    private fun renderScrollbar(graphics: GuiGraphics) {
         if (maxScroll <= 0) return
         val thumbHeight = (visibleHeight.toFloat() / totalContentHeight * visibleHeight).toInt().coerceAtLeast(10)
         val thumbY = LIST_TOP + ((smoothScroll / maxScroll) * (visibleHeight - thumbHeight)).toInt()
@@ -231,15 +230,15 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
         graphics.fill(scrollBarLeft, thumbY, scrollBarRight, thumbY + thumbHeight, SCROLL_THUMB)
     }
 
-    override fun mouseClicked(event: MouseButtonEvent, doubleClick: Boolean): Boolean {
-        if (event.button() == 0) {
-            val index = entryIndexAt(event.x.toInt(), event.y.toInt())
+    override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
+        if (button == 0) {
+            val index = entryIndexAt(mouseX.toInt(), mouseY.toInt())
             if (index >= 0) {
-                minecraft.setScreen(ChangelogDetailScreen(rows[index].entry, this))
+                minecraft?.setScreen(ChangelogDetailScreen(rows[index].entry, this))
                 return true
             }
         }
-        return super.mouseClicked(event, doubleClick)
+        return super.mouseClicked(mouseX, mouseY, button)
     }
 
     override fun mouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean {
@@ -261,7 +260,7 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
     }
 
     override fun onClose() {
-        minecraft.setScreen(parentScreen)
+        minecraft?.setScreen(parentScreen)
     }
 
     override fun isPauseScreen() = false

@@ -9,7 +9,7 @@ class ModConfig : ConfigData {
 
     @Comment("URL of the remote changelog JSON file (must return raw JSON, not an HTML page)")
     var changelogUrl: String =
-        "https://raw.githubusercontent.com/fanziyun/363changelog/26.1.2/common/src/main/resources/changelog.json"
+        "https://raw.githubusercontent.com/fanziyun/363changelog/1.21.1/common/src/main/resources/changelog.json"
 
     @Comment("Modpack display name shown in the bottom-left of the title screen")
     var packName: String = "363Changelog"

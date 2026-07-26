@@ -6,7 +6,7 @@ import com.github.fanziyun.screen.ChangelogOverviewScreen
 import com.github.fanziyun.util.ButtonPlacement
 import com.github.fanziyun.util.ColorUtil
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen
@@ -44,9 +44,9 @@ abstract class TitleScreenMixin : Screen(Component.literal("")) {
         )
     }
 
-    @Inject(method = ["extractRenderState"], at = [At("TAIL")])
+    @Inject(method = ["render"], at = [At("TAIL")])
     fun changelog363_renderVersionLine(
-        graphics: GuiGraphicsExtractor,
+        graphics: GuiGraphics,
         mouseX: Int,
         mouseY: Int,
         partialTick: Float,
@@ -57,7 +57,7 @@ abstract class TitleScreenMixin : Screen(Component.literal("")) {
         val label = listOfNotNull(config.packName.takeIf(String::isNotBlank), "v${config.modpackVersion}")
             .joinToString(" ")
         val lineY = height - config.versionYOffset
-        graphics.text(font, label, 2, lineY, ColorUtil.WHITE)
+        graphics.drawString(font, label, 2, lineY, ColorUtil.WHITE)
 
         // 检测结束前不下结论，避免先显示"已是最新版本"再跳变成"有新版本"
         if (!config.enableVersionCheck || !VersionChecker.isDone) return
@@ -68,7 +68,7 @@ abstract class TitleScreenMixin : Screen(Component.literal("")) {
         } else {
             Component.translatable("screen.changelog363.up_to_date")
         }
-        graphics.text(
+        graphics.drawString(
             font,
             " ${status.string}",
             2 + font.width(label),

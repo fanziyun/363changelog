@@ -1,7 +1,8 @@
 plugins {
     kotlin("jvm")
     // NeoForm 模式：只要原版 Minecraft，不带任何加载器。
-    // 26.1 起 Minecraft 不再混淆，所以这里编出来的类在两个加载器上都能直接用。
+    // 1.21.1 仍是混淆版本，NeoForm 反混淆到 Mojang 官方映射；
+    // :fabric 那边也指定了同一套映射，所以这里编出来的类在两个加载器上都能直接用。
     id("net.neoforged.moddev")
 }
 
@@ -14,8 +15,13 @@ neoForge {
 dependencies {
     // Fabric 与 NeoForge 都内置 Fabric Mixin，因此 mixin 可以放在 common 里编译
     compileOnly("net.fabricmc:sponge-mixin:${rootProject.property("mixin_version")}")
-    // 平台无关的 Cloth Config：ModConfig 上的注解与 AutoConfig 调用都来自它
-    compileOnly("me.shedaniel.cloth:cloth-config:${rootProject.property("cloth_config_version")}")
+    // Cloth Config 提供 ModConfig 上的注解与 AutoConfig 调用。
+    // 1.21.1 上平台无关的 cloth-config 制品是 intermediary 名字（getConfigScreen 返回 class_437），
+    // 和 NeoForm 给出的官方映射对不上，所以 common 借用 mojmap 命名的 NeoForge 构建来编译；
+    // 运行时用的是各加载器自己带的 Cloth Config，这里只是编译期借个名字
+    compileOnly("me.shedaniel.cloth:cloth-config-neoforge:${rootProject.property("cloth_config_version")}") {
+        isTransitive = false
+    }
 }
 
 // common 只提供源码给 :fabric / :neoforge，自身不产出可用的模组 jar。

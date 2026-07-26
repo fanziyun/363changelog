@@ -4,7 +4,7 @@ import com.github.fanziyun.data.ChangelogEntry
 import com.github.fanziyun.util.ChangelogType
 import com.github.fanziyun.util.ColorUtil
 import net.minecraft.client.gui.Font
-import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.network.chat.Component
 
 /** 一枚待绘制的标签：显示文本 + 背景色。 */
@@ -57,10 +57,10 @@ fun Font.fitBadges(badges: List<Badge>, startX: Int, limitX: Int): List<Badge> {
  * 底色用标签自身的颜色，文字一律白色 —— 不再按底色亮度在黑白之间切换。
  * 白字自带的一像素深色阴影正好在浅底上勾出轮廓，亮绿、亮黄这类底色也能看清。
  */
-fun GuiGraphicsExtractor.drawBadge(font: Font, badge: Badge, x: Int, y: Int): Int {
+fun GuiGraphics.drawBadge(font: Font, badge: Badge, x: Int, y: Int): Int {
     val badgeWidth = font.badgeWidth(badge)
     fill(x, y, x + badgeWidth, y + BADGE_HEIGHT, badge.color)
-    text(font, badge.text, x + BADGE_PADDING, y + 1, ColorUtil.WHITE)
+    drawString(font, badge.text, x + BADGE_PADDING, y + 1, ColorUtil.WHITE)
     return x + badgeWidth + BADGE_GAP
 }
 

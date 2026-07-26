@@ -1,7 +1,7 @@
 # 363Changelog
 
 一个 Minecraft 模组，在主菜单与暂停界面展示整合包更新日志，支持远程获取与版本检测。
-**同时支持 Fabric 与 NeoForge**（Minecraft 26.1.2）。
+**同时支持 Fabric 与 NeoForge**（Minecraft 1.21.1）。
 
 ## 安装 / Installation
 
@@ -28,7 +28,7 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `externalLinkName` | String | `"项目主页"` | 外部链接按钮的显示名称。留空则不显示该按钮。 |
 | `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | 外部链接按钮的目标 URL。 |
 
-`changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/26.1.2/common/src/main/resources/changelog.json`
+`changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/1.21.1/common/src/main/resources/changelog.json`
 
 数据来源按 **远程 URL → 本地缓存 → 模组内置 changelog.json** 的顺序回退，任一环节成功即停止；
 远程请求会带 `If-None-Match`，命中 304 时直接复用本地缓存。
@@ -155,8 +155,11 @@ neoforge/   NeoForge 入口点 + 配置界面注册 + Platform 实现
 
 `common` 用 ModDevGradle 的 **NeoForm 模式**编译，只对着原版 Minecraft，不带任何加载器。
 两个加载器子项目**直接把 `common` 的源码编进各自的 jar**（`kotlin.srcDir`），
-不依赖 `common` 的产物 —— Minecraft 从 26.1 起不再混淆，两边引用的是同一套官方名字，
-所以共享源码不需要任何重映射中间层。
+不依赖 `common` 的产物 —— 1.21.1 还是混淆版本，这么共享的前提是两边用同一套
+**Mojang 官方映射**：`common` 走 NeoForm，`:fabric` 在 Loom 里显式选 `officialMojangMappings()`，
+产物再由 `remapJar` 重映射回 intermediary。因为 mixin 是 Kotlin 写的、
+Mixin 注解处理器（Java AP）生成不了 refmap，`:fabric` 改用 tiny-remapper 的
+mixin 扩展（`useLegacyMixinAp = false`）直接在字节码层重映射注解。
 
 平台差异只有一处：[`Platform`](common/src/main/kotlin/com/github/fanziyun/platform/Platform.kt)
 接口的 `gameDir`（缓存目录），由各子项目通过 `META-INF/services` 注册实现。
@@ -178,7 +181,7 @@ Mixin 也放在 `common`：Fabric 与 NeoForge 都内置 Fabric Mixin，
 产物分别在 `fabric/build/libs/` 与 `neoforge/build/libs/`。
 
 > 首次构建会下载并反编译 Minecraft，耗时可能超过半小时，属正常现象。
-> 构建需要 JDK 25；本机没装的话 `settings.gradle.kts` 里的 foojay resolver 会自动下载。
+> 构建需要 JDK 21（1.21.1 跑在 Java 21 上）；本机没装的话 `settings.gradle.kts` 里的 foojay resolver 会自动下载。
 
 ### 版本对照
 
@@ -186,15 +189,18 @@ Mixin 也放在 `common`：Fabric 与 NeoForge 都内置 Fabric Mixin，
 
 | 组件 | 版本 |
 |------|------|
-| Minecraft | 26.1.2 |
+| Minecraft | 1.21.1 |
 | Fabric Loom / ModDevGradle | 1.15.5 / 2.0.141 |
-| NeoForm（common 用） | 26.1.2-1 |
-| NeoForge | 26.1.2.87 |
+| NeoForm（common 用） | 1.21.1-20240808.144430 |
+| NeoForge | 21.1.243 |
 | Kotlin | 2.3.21 |
 
-> Kotlin for Forge 6.2.0 内置的 Kotlin 标准库是 **2.3.10**，而本项目用 2.3.21 编译。
-> 同一 minor 内标准库 API 兼容，本模组也只用了长期稳定的 API，所以没问题；
-> 但如果将来用到 2.3.11+ 才引入的标准库 API，就需要换用绑定了对应版本的语言提供者。
+> Loom 1.15 起插件 id `net.fabricmc.fabric-loom` 是"无重映射"版（面向不再混淆的 26.x），
+> 1.21.1 这种混淆版本要用 `net.fabricmc.fabric-loom-remap`（同一制品里的完整版）。
+>
+> Kotlin for Forge 5.12.0 内置的 Kotlin 标准库是 **2.4.0**，高于本项目编译用的 2.3.21；
+> 标准库向后兼容旧编译器产物，所以没有问题。Fabric 侧的 fabric-language-kotlin
+> 则正好绑定 2.3.21，与编译版本一致。
 
 ### Changelog 编辑器
 

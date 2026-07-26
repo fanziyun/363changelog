@@ -4,6 +4,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("jvm") version "2.3.21" apply false
     // see https://fabricmc.net/develop/ for new versions
+    // 这里只负责把 loom 制品放上构建类路径；:fabric 实际应用的是同一制品里的
+    // net.fabricmc.fabric-loom-remap（1.21.1 是混淆版本，需要带重映射的完整版 loom）
     id("net.fabricmc.fabric-loom") version "1.15.5" apply false
     // see https://projects.neoforged.net/neoforged/moddevgradle for new versions
     id("net.neoforged.moddev") version "2.0.141" apply false

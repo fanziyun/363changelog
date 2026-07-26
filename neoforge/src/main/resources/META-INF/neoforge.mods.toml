@@ -36,14 +36,15 @@ side = "CLIENT"
 [[dependencies.${mod_id}]]
 modId = "kotlinforforge"
 type = "required"
-versionRange = "[6,)"
+# 1.21.1 对应 KFF 5.x（6.x 只支持 1.21.4+）
+versionRange = "[5,)"
 ordering = "AFTER"
 side = "CLIENT"
 
 [[dependencies.${mod_id}]]
 modId = "cloth_config"
 type = "required"
-# Cloth 的 NeoForge 构建自报版本形如 26.1.154
+# Cloth 的 NeoForge 构建自报版本形如 15.0.140
 versionRange = "[${cloth_config_version},)"
 ordering = "AFTER"
 side = "CLIENT"

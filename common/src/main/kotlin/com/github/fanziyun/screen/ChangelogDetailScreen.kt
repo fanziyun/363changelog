@@ -3,7 +3,7 @@ package com.github.fanziyun.screen
 import com.github.fanziyun.data.ChangelogEntry
 import com.github.fanziyun.data.ChangelogLoader
 import com.github.fanziyun.util.ColorUtil
-import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.Component
@@ -63,14 +63,14 @@ class ChangelogDetailScreen(
         }
     }
 
-    override fun extractRenderState(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick)
+    override fun render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
+        super.render(graphics, mouseX, mouseY, partialTick)
 
-        graphics.text(font, headlineText, (width - font.width(headlineText)) / 2, 20, entry.color)
+        graphics.drawString(font, headlineText, (width - font.width(headlineText)) / 2, 20, entry.color)
 
         if (entry.date.isNotBlank()) {
             val dateText = Component.translatable("screen.changelog363.date", entry.date).string
-            graphics.text(font, dateText, (width - font.width(dateText)) / 2, 35, ColorUtil.GREY)
+            graphics.drawString(font, dateText, (width - font.width(dateText)) / 2, 35, ColorUtil.GREY)
         }
 
         renderBadges(graphics, BADGES_TOP)
@@ -83,24 +83,24 @@ class ChangelogDetailScreen(
         var y = CHANGES_TOP
         for (index in 0 until shown) {
             val line = lines[index]
-            graphics.text(font, line.text, CONTENT_LEFT + line.indent, y, ColorUtil.LIGHT_GREY)
+            graphics.drawString(font, line.text, CONTENT_LEFT + line.indent, y, ColorUtil.LIGHT_GREY)
             y += LINE_HEIGHT
         }
         if (truncated) {
             // 这行没有参与折行，长翻译会直接顶出右边界
             val more = Component.translatable("screen.changelog363.more", lines.size - shown).string
-            graphics.text(font, font.ellipsize(more, width - CONTENT_LEFT * 2), CONTENT_LEFT, y, ColorUtil.GREY)
+            graphics.drawString(font, font.ellipsize(more, width - CONTENT_LEFT * 2), CONTENT_LEFT, y, ColorUtil.GREY)
         }
     }
 
-    private fun renderBadges(graphics: GuiGraphicsExtractor, y: Int) {
+    private fun renderBadges(graphics: GuiGraphics, y: Int) {
         if (badges.isEmpty()) return
         var x = (width - font.badgeRowWidth(badges)) / 2
         for (badge in badges) x = graphics.drawBadge(font, badge, x, y)
     }
 
     override fun onClose() {
-        minecraft.setScreen(parentScreen)
+        minecraft?.setScreen(parentScreen)
     }
 
     override fun isPauseScreen() = false

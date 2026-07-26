@@ -4,7 +4,6 @@ import com.github.fanziyun.config.ModConfig
 import com.github.fanziyun.data.ChangelogLoader
 import com.github.fanziyun.data.VersionChecker
 import me.shedaniel.autoconfig.AutoConfig
-import me.shedaniel.autoconfig.AutoConfigClient
 import me.shedaniel.autoconfig.serializer.GsonConfigSerializer
 import net.minecraft.client.gui.screens.Screen
 import java.util.concurrent.CompletableFuture
@@ -33,8 +32,9 @@ object ChangelogService {
     }
 
     /** ModMenu / NeoForge 模组列表里那个"配置"按钮打开的界面。 */
+    // Cloth Config 15.x（1.21.1）还没拆出 AutoConfigClient，配置界面直接从 AutoConfig 拿
     fun configScreen(parent: Screen?): Screen =
-        AutoConfigClient.getConfigScreen(ModConfig::class.java, parent).get()
+        AutoConfig.getConfigScreen(ModConfig::class.java, parent).get()
 
     /**
      * 确保更新日志已加载，并在加载完成后立即执行版本检测。
