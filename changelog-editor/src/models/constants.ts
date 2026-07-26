@@ -25,4 +25,4 @@ export function typeColor(type: string): string {
 export const DEFAULT_ENTRY_COLOR = '0xFF888888'
 
 /** 仓库中 changelog.json 的路径，需与模组配置的 changelogUrl 指向同一个文件 */
-export const CHANGELOG_PATH = 'src/main/resources/changelog.json'
+export const CHANGELOG_PATH = 'common/src/main/resources/changelog.json'

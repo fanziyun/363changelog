@@ -19,6 +19,10 @@ hs_err_pid*
 
 # Common working directory
 run
+# 各加载器子项目的开发运行目录（fabric/runs、neoforge/runs）
+runs/
+# ModDevGradle / NeoForge datagen 输出
+neoforge/src/generated/
 
 # Changelog editor
 changelog-editor/node_modules/
