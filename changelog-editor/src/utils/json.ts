@@ -1,4 +1,5 @@
 import type { ChangelogData, ChangelogEntry } from '../models/ChangelogData'
+import { DEFAULT_ENTRY_COLOR } from '../models/constants'
 import type { ChangelogDataExport, ChangelogEntryExport } from './types'
 
 /**
@@ -22,8 +23,8 @@ function toEntryExport(entry: ChangelogEntry): ChangelogEntryExport {
   }
   if (entry.date) e.date = entry.date
   if (entry.title) e.title = entry.title
-  if (entry.type && entry.type.length > 0) e.type = entry.type
-  if (entry.tags && entry.tags.length > 0) e.tags = entry.tags
+  if (entry.type?.length) e.type = entry.type
+  if (entry.tags?.length) e.tags = entry.tags
   if (entry.color) e.color = entry.color
   return e
 }
@@ -32,8 +33,8 @@ function toEntryExport(entry: ChangelogEntry): ChangelogEntryExport {
  * 从 JSON 字符串解析为 ChangelogData
  */
 export function fromImportJson(json: string): ChangelogData {
-  const parsed: ChangelogDataExport = JSON.parse(json)
-  if (!parsed.entries || !Array.isArray(parsed.entries)) {
+  const parsed = JSON.parse(json) as ChangelogDataExport
+  if (!Array.isArray(parsed?.entries)) {
     throw new Error('JSON 格式错误: 缺少 entries 数组')
   }
   return {
@@ -50,7 +51,7 @@ function fromEntryExport(e: ChangelogEntryExport): ChangelogEntry {
     title: e.title || '',
     type: Array.isArray(e.type) ? e.type : [],
     tags: Array.isArray(e.tags) ? e.tags : [],
-    color: e.color || '0xFF888888',
+    color: e.color || DEFAULT_ENTRY_COLOR,
     changes: Array.isArray(e.changes) ? e.changes : [],
   }
 }
@@ -62,26 +63,21 @@ export interface ValidationError {
 }
 
 /**
- * 编译校验: 检查所有条目的 version 和 changes 字段
- * 空 version 或空 changes → 错误
- */
-export function validateAllEntries(entries: ChangelogEntry[]): ValidationError[] {
-  return entries
-    .map((e, i) => {
-      const errors: string[] = []
-      if (!e.version.trim()) errors.push('版本号不能为空')
-      if (e.changes.length === 0) errors.push('变更明细不能为空')
-      return errors.length > 0 ? { index: i, version: e.version || '(空)', errors } : null
-    })
-    .filter((v): v is ValidationError => v !== null)
-}
-
-/**
- * 校验单个条目
+ * 校验单个条目：version 与 changes 是模组端的必填字段
  */
 export function validateEntry(entry: ChangelogEntry): string[] {
   const errors: string[] = []
   if (!entry.version.trim()) errors.push('版本号不能为空')
   if (entry.changes.length === 0) errors.push('变更明细不能为空')
   return errors
+}
+
+/**
+ * 编译校验: 逐条运行 [validateEntry]，只保留有问题的条目
+ */
+export function validateAllEntries(entries: ChangelogEntry[]): ValidationError[] {
+  return entries.flatMap((entry, index) => {
+    const errors = validateEntry(entry)
+    return errors.length > 0 ? [{ index, version: entry.version || '(空)', errors }] : []
+  })
 }

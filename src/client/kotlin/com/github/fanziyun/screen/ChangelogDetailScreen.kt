@@ -10,57 +10,98 @@ import net.minecraft.network.chat.Component
 
 class ChangelogDetailScreen(
     private val entry: ChangelogEntry,
-    private val parentScreen: Screen?
-) : Screen(Component.literal("${entry.versionOrEmpty} - ${entry.titleOrEmpty}")) {
+    private val parentScreen: Screen?,
+) : Screen(Component.literal(headline(entry))) {
+
+    private companion object {
+        const val CONTENT_LEFT = 30
+        const val BADGES_TOP = 50
+        const val CHANGES_TOP = 65
+        const val LINE_HEIGHT = 12
+        const val BOTTOM_MARGIN = 40
+        const val BULLET = "• "
+
+        /** 标题缺失时不要留下多余的分隔符 */
+        fun headline(entry: ChangelogEntry): String =
+            listOf(entry.version, entry.title).filter(String::isNotBlank).joinToString(" - ")
+    }
+
+    /** 折行后的一行文本；[indent] 用于让续行对齐到项目符号之后 */
+    private class Line(val text: String, val indent: Int)
+
+    private var lines: List<Line> = emptyList()
+    private var badges: List<Badge> = emptyList()
+    private var headlineText: String = ""
 
     override fun init() {
         super.init()
         addRenderableWidget(
             Button.builder(Component.translatable("gui.back")) { onClose() }
-                .bounds(width / 2 - 50, height - 30, 100, 20).build()
+                .bounds(width / 2 - 50, height - 30, 100, 20)
+                .build()
         )
+
+        val contentWidth = width - CONTENT_LEFT * 2
+
+        // 标题同样是居中绘制的，过长时 x 会算成负数、两头都戳出屏幕
+        headlineText = font.ellipsize(title.string, contentWidth)
+
+        // 标签整排居中，总宽超出时同理，所以先按宽度截断
+        badges = font.fitBadges(
+            badgesOf(entry, ChangelogLoader.data.tagColors),
+            startX = 0,
+            limitX = contentWidth,
+        )
+
+        // 折行开销较大，只在 init（含窗口尺寸变化）时算一次
+        val bulletWidth = font.width(BULLET)
+        val textWidth = contentWidth - bulletWidth
+        lines = entry.changes.flatMap { change ->
+            font.wrap(change, textWidth).mapIndexed { index, part ->
+                if (index == 0) Line(BULLET + part, 0) else Line(part, bulletWidth)
+            }
+        }
     }
 
     override fun extractRenderState(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick)
 
-        val titleText = "${entry.versionOrEmpty} - ${entry.titleOrEmpty}"
-        graphics.text(font, titleText, width / 2 - font.width(titleText) / 2, 20, entry.parsedColor)
+        graphics.text(font, headlineText, (width - font.width(headlineText)) / 2, 20, entry.color)
 
-        if (entry.dateOrEmpty.isNotBlank()) {
-            val dateText = "日期: ${entry.dateOrEmpty}"
-            graphics.text(font, dateText, width / 2 - font.width(dateText) / 2, 35, 0xFFAAAAAA.toInt())
+        if (entry.date.isNotBlank()) {
+            val dateText = Component.translatable("screen.changelog363.date", entry.date).string
+            graphics.text(font, dateText, (width - font.width(dateText)) / 2, 35, ColorUtil.GREY)
         }
 
-        renderTags(graphics, 50)
+        renderBadges(graphics, BADGES_TOP)
 
-        var y = 65
-        for (change in entry.changesOrEmpty) {
-            if (y > height - 40) break
-            graphics.text(font, "• $change", 30, y, 0xFFDDDDDD.toInt())
-            y += 12
-        }
-    }
+        val capacity = ((height - BOTTOM_MARGIN - CHANGES_TOP) / LINE_HEIGHT).coerceAtLeast(0)
+        val truncated = lines.size > capacity
+        // 放不下时留出最后一行显示"还有 N 行"
+        val shown = if (truncated) (capacity - 1).coerceAtLeast(0) else lines.size
 
-    private fun renderTags(graphics: GuiGraphicsExtractor, y: Int) {
-        val tags = mutableListOf<Pair<String, Int>>()
-        for (t in entry.typeOrEmpty) tags.add(ColorUtil.getTypeDisplayName(t, true) to ColorUtil.getTypeColor(t))
-        for (t in entry.tagsOrEmpty) {
-            val c = ColorUtil.parseColor(ChangelogLoader.data.tagColorsOrEmpty[t] ?: "#888888", 0xFF888888.toInt())
-            tags.add(t to c)
+        var y = CHANGES_TOP
+        for (index in 0 until shown) {
+            val line = lines[index]
+            graphics.text(font, line.text, CONTENT_LEFT + line.indent, y, ColorUtil.LIGHT_GREY)
+            y += LINE_HEIGHT
         }
-        if (tags.isEmpty()) return
-        val totalW = tags.sumOf { font.width(it.first) + 10 }
-        var x = (width - totalW) / 2
-        for ((text, color) in tags) {
-            val w = font.width(text) + 6
-            graphics.fill(x, y - 1, x + w, y + 9, color)
-            val textColor = if (ColorUtil.isBright(color)) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
-            graphics.text(font, text, x + 3, y, textColor)
-            x += w + 4
+        if (truncated) {
+            // 这行没有参与折行，长翻译会直接顶出右边界
+            val more = Component.translatable("screen.changelog363.more", lines.size - shown).string
+            graphics.text(font, font.ellipsize(more, width - CONTENT_LEFT * 2), CONTENT_LEFT, y, ColorUtil.GREY)
         }
     }
 
-    override fun onClose() { minecraft.setScreen(parentScreen) }
+    private fun renderBadges(graphics: GuiGraphicsExtractor, y: Int) {
+        if (badges.isEmpty()) return
+        var x = (width - font.badgeRowWidth(badges)) / 2
+        for (badge in badges) x = graphics.drawBadge(font, badge, x, y)
+    }
+
+    override fun onClose() {
+        minecraft.setScreen(parentScreen)
+    }
+
     override fun isPauseScreen() = false
 }

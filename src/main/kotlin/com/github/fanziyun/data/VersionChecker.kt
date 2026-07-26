@@ -1,16 +1,15 @@
 package com.github.fanziyun.data
 
 import com.github.fanziyun.Changelog
-import java.util.concurrent.CompletableFuture
+import com.github.fanziyun.util.SemVer
 
 /**
- * 版本检测服务
+ * 版本检测。
+ *
+ * 直接复用 [ChangelogLoader] 已加载的数据做比较，不会额外发起 HTTP 请求，
+ * 因此必须在加载完成之后调用（见 `ChangelogClient.ensureChangelogLoaded`）。
  */
 object VersionChecker {
-
-    @Volatile
-    var isChecking: Boolean = false
-        private set
 
     @Volatile
     var isDone: Boolean = false
@@ -28,45 +27,30 @@ object VersionChecker {
     var currentVersion: String = ""
         private set
 
-    /** 异步检查更新（复用 ChangelogLoader 已加载的数据，避免重复 HTTP 请求） */
-    fun checkAsync(modpackVersion: String) {
-        if (isChecking || modpackVersion.isBlank()) {
+    /** 比较整合包版本与更新日志中的最高版本。 */
+    @Synchronized
+    fun check(modpackVersion: String) {
+        currentVersion = modpackVersion
+        if (modpackVersion.isBlank()) {
+            hasUpdate = false
             isDone = true
             return
         }
-
-        currentVersion = modpackVersion
-        isChecking = true
-
-        CompletableFuture.runAsync {
-            try {
-                val latest = ChangelogLoader.latestVersionFromData
-                latestVersion = latest
-                hasUpdate = latest.isNotBlank() && compareSemver(latest, modpackVersion) > 0
-                Changelog.LOGGER.info(
-                    "Version check: current={}, latest={}, hasUpdate={}",
-                    modpackVersion, latest, hasUpdate
-                )
-            } catch (e: Exception) {
-                Changelog.LOGGER.error("Version check failed", e)
-            } finally {
-                isChecking = false
-                isDone = true
-            }
-        }
+        val latest = ChangelogLoader.latestVersion
+        latestVersion = latest
+        hasUpdate = latest.isNotBlank() && SemVer.compare(latest, modpackVersion) > 0
+        isDone = true
+        Changelog.LOGGER.info(
+            "Version check: current={}, latest={}, hasUpdate={}",
+            modpackVersion, latest, hasUpdate
+        )
     }
 
-    // 语义化版本比较，返回正数代表 a > b，负数 a < b，0 相等
-    private fun compareSemver(a: String, b: String): Int {
-        val aParts = a.split('.').mapNotNull { it.toIntOrNull() }
-        val bParts = b.split('.').mapNotNull { it.toIntOrNull() }
-        val maxLen = maxOf(aParts.size, bParts.size)
-        for (i in 0 until maxLen) {
-            val aNum = aParts.getOrElse(i) { 0 }
-            val bNum = bParts.getOrElse(i) { 0 }
-            if (aNum != bNum) return aNum - bNum
-        }
-        return 0
+    /** 重新拉取数据前调用，让界面回到"检测中"状态。 */
+    @Synchronized
+    fun reset() {
+        isDone = false
+        hasUpdate = false
+        latestVersion = ""
     }
-
 }

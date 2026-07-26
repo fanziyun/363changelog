@@ -10,142 +10,232 @@ import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.Tooltip
 import net.minecraft.client.gui.screens.ConfirmLinkScreen
 import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.network.chat.Component
 import java.net.URI
+import kotlin.math.abs
 
-class ChangelogOverviewScreen(parent: Screen?) : Screen(Component.translatable("screen.changelog363.title")) {
+class ChangelogOverviewScreen(private val parentScreen: Screen?) :
+    Screen(Component.translatable("screen.changelog363.title")) {
 
-    private val parentScreen = parent
+    private companion object {
+        const val SLOT_HEIGHT = 50
+        const val LIST_LEFT = 20
+        const val LIST_TOP = 55
+        const val TEXT_LEFT = 32
+
+        /** 磁贴内容与磁贴右边缘之间的留白，取值与左侧留白（TEXT_LEFT - LIST_LEFT）一致 */
+        const val ROW_PADDING = TEXT_LEFT - LIST_LEFT
+
+        /** 类型标签与右侧日期之间至少留出的间隔 */
+        const val GAP_BEFORE_DATE = 4
+
+        /** 版本号与第一个类型标签之间的间隔 */
+        const val GAP_AFTER_VERSION = 6
+
+        const val SCROLL_BAR_WIDTH = 6
+        const val SCROLL_STEP = 20
+        const val SCROLL_SMOOTHING = 0.25f
+
+        const val ROW_BACKGROUND = 0x1AFFFFFF
+        const val ROW_HOVERED = 0x33FFFFFF
+        const val DIVIDER = 0x44FFFFFF
+        const val SCROLL_TRACK = 0x33FFFFFF
+        val SCROLL_THUMB = 0xAAFFFFFF.toInt()
+    }
+
+    /** 预先测量并排布好的一行内容，避免每帧重复计算文本宽度。 */
+    private class Row(
+        val entry: ChangelogEntry,
+        val versionText: String,
+        val versionColor: Int,
+        val badges: List<Badge>,
+        val badgeX: Int,
+        val date: String,
+        val dateX: Int,
+        val title: String,
+        val summary: String,
+    )
+
+    private var rows: List<Row> = emptyList()
     private var targetScroll = 0
     private var smoothScroll = 0f
     private var hoveredIndex = -1
-    private val slotHeight = 50
-    private val listLeft = 20
+
     private val listRight: Int get() = width - 30
-    private val scrollBarWidth = 6
-    private val scrollBarRight: Int get() = width - 10
-    private val scrollBarLeft: Int get() = scrollBarRight - scrollBarWidth
-    private val listTop = 55
     private val listBottom: Int get() = height - 60
+    private val scrollBarRight: Int get() = width - 10
+    private val scrollBarLeft: Int get() = scrollBarRight - SCROLL_BAR_WIDTH
 
-    private val totalContentHeight: Int get() = ChangelogLoader.data.entriesOrEmpty.size * slotHeight
-    private val visibleHeight: Int get() = listBottom - listTop
+    private val visibleHeight: Int get() = listBottom - LIST_TOP
+    private val totalContentHeight: Int get() = rows.size * SLOT_HEIGHT
     private val maxScroll: Int get() = (totalContentHeight - visibleHeight).coerceAtLeast(0)
-
-    private val scrollOffset: Int get() = smoothScroll.toInt()
 
     override fun init() {
         super.init()
-        val totalBtnWidth = 214
-        val btnLeft = width / 2 - totalBtnWidth / 2
+        rebuildRows()
+
+        val totalButtonWidth = 214
+        val buttonLeft = width / 2 - totalButtonWidth / 2
         val gap = 4
 
-        val cfg = ChangelogClient.config
-        val hasLink = cfg != null && cfg.externalLinkUrl.isNotBlank() && cfg.externalLinkName.isNotBlank()
-        val linkWidth = if (hasLink) (totalBtnWidth - gap) / 3 else 0
-        val backWidth = (totalBtnWidth - gap) - linkWidth
+        val config = ChangelogClient.config
+        val linkName = config?.externalLinkName?.takeIf(String::isNotBlank)
+        // 配置里的 URL 可能写错，解析失败时直接不显示按钮，而不是等到点击时抛异常
+        val linkUri = config?.externalLinkUrl?.let(::parseHttpUri)
 
-        if (hasLink) {
+        val buttonY = height - 30
+        if (linkName != null && linkUri != null) {
+            val linkWidth = (totalButtonWidth - gap) / 3
             addRenderableWidget(
-                Button.builder(Component.literal(cfg.externalLinkName)) {
-                    ConfirmLinkScreen.confirmLinkNow(this, URI.create(cfg.externalLinkUrl))
-                }.bounds(btnLeft, height - 30, linkWidth, 20).build()
+                Button.builder(Component.literal(linkName)) { ConfirmLinkScreen.confirmLinkNow(this, linkUri) }
+                    .bounds(buttonLeft, buttonY, linkWidth, 20)
+                    .build()
+            )
+            addRenderableWidget(
+                Button.builder(Component.translatable("gui.back")) { onClose() }
+                    .bounds(buttonLeft + linkWidth + gap, buttonY, totalButtonWidth - gap - linkWidth, 20)
+                    .build()
+            )
+        } else {
+            // 没有外链按钮时让返回键独占整条，否则它会偏右 2px 且短 4px
+            addRenderableWidget(
+                Button.builder(Component.translatable("gui.back")) { onClose() }
+                    .bounds(buttonLeft, buttonY, totalButtonWidth, 20)
+                    .build()
             )
         }
 
         addRenderableWidget(
-            Button.builder(Component.translatable("gui.back")) {
-                minecraft.setScreen(parentScreen)
-            }.bounds(btnLeft + linkWidth + gap, height - 30, backWidth, 20).build()
-        )
-
-        addRenderableWidget(
             Button.builder(Component.translatable("screen.changelog363.refresh")) {
-                val url = ChangelogClient.config?.changelogUrl ?: ""
-                ChangelogLoader.load(url, forceRefresh = true).thenRun {
-                    minecraft.execute {
-                        minecraft.setScreen(ChangelogOverviewScreen(parentScreen))
-                    }
-                }
-            }.bounds(width - 100, 10, 90, 20).tooltip(Tooltip.create(Component.translatable("screen.changelog363.refresh.tooltip"))).build()
+                ChangelogClient.ensureChangelogLoaded(forceRefresh = true)
+                    .thenRun { minecraft.execute(::rebuildRows) }
+            }
+                .bounds(width - 100, 10, 90, 20)
+                .tooltip(Tooltip.create(Component.translatable("screen.changelog363.refresh.tooltip")))
+                .build()
         )
+    }
+
+    /** 只接受绝对的 http(s) 链接，其余（空串、相对路径、file:// 等）一律视为未配置 */
+    private fun parseHttpUri(raw: String): URI? =
+        runCatching { URI.create(raw.trim()) }.getOrNull()
+            ?.takeIf { it.isAbsolute && (it.scheme.equals("http", true) || it.scheme.equals("https", true)) }
+
+    private fun rebuildRows() {
+        // 内容右边界要比磁贴右边缘再收一点，否则日期会紧贴着磁贴边框
+        val contentRight = listRight - ROW_PADDING
+        val textWidth = contentRight - TEXT_LEFT
+
+        rows = ChangelogLoader.data.entries.map { entry ->
+            val type = entry.types.first()
+
+            val date = entry.date
+            val dateWidth = if (date.isBlank()) 0 else font.width(date)
+            val dateX = contentRight - dateWidth
+            // 第一行（版本号 + 类型标签）共用的右边界：不能越过右对齐的日期
+            val lineLimit = if (dateWidth == 0) contentRight else dateX - GAP_BEFORE_DATE
+
+            // 版本号自身也要截断，否则超长版本号会直接画到日期上，
+            // 而且会把 badgeX 顶过 lineLimit 导致类型标签全部消失
+            val versionText = font.ellipsize(
+                "${ColorUtil.typeIcon(type)} ${entry.version}",
+                lineLimit - TEXT_LEFT,
+            )
+            val badgeX = TEXT_LEFT + font.width(versionText) + GAP_AFTER_VERSION
+
+            Row(
+                entry = entry,
+                versionText = versionText,
+                versionColor = ColorUtil.typeColor(type),
+                // 标签只排到日期左侧为止，放不下的整枚不画
+                badges = font.fitBadges(entry.types.map(::typeBadge), badgeX, lineLimit),
+                badgeX = badgeX,
+                date = date,
+                dateX = dateX,
+                title = font.ellipsize(entry.title, textWidth),
+                summary = entry.changes.firstOrNull()
+                    ?.let { font.ellipsize("• $it", textWidth) }
+                    .orEmpty(),
+            )
+        }
+        clampScroll()
     }
 
     override fun extractRenderState(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick)
 
-        smoothScroll += (targetScroll - smoothScroll) * 0.25f
-        if (kotlin.math.abs(smoothScroll - targetScroll) < 0.5f) smoothScroll = targetScroll.toFloat()
+        clampScroll()
+        smoothScroll += (targetScroll - smoothScroll) * SCROLL_SMOOTHING
+        if (abs(smoothScroll - targetScroll) < 0.5f) smoothScroll = targetScroll.toFloat()
+        // 在渲染时判定悬停，滚轮滚动（鼠标不动）时高亮也能跟着更新
+        hoveredIndex = entryIndexAt(mouseX, mouseY)
 
         val titleText = title.string
-        graphics.text(font, titleText, width / 2 - font.width(titleText) / 2, 20, 0xFFFFFF)
+        graphics.text(font, titleText, (width - font.width(titleText)) / 2, 20, ColorUtil.WHITE)
 
-        val stats = Component.translatable("screen.changelog363.stats", ChangelogLoader.data.entriesOrEmpty.size).string
-        graphics.text(font, stats, 20, 35, 0xFFAAAAAA.toInt())
+        val stats = Component.translatable("screen.changelog363.stats", rows.size).string
+        graphics.text(font, stats, LIST_LEFT, 35, ColorUtil.GREY)
 
-        val config = ChangelogClient.config
-        if (config?.enableVersionCheck == true && VersionChecker.isDone && VersionChecker.hasUpdate) {
-            val updateText = "新版本: ${VersionChecker.latestVersion}"
-            graphics.text(font, updateText, 20 + font.width(stats) + 4, 35, 0xFF_FF_FF_55.toInt())
+        if (ChangelogClient.config?.enableVersionCheck == true && VersionChecker.isDone && VersionChecker.hasUpdate) {
+            val update = Component.translatable(
+                "screen.changelog363.update_available", VersionChecker.latestVersion
+            ).string
+            graphics.text(font, update, LIST_LEFT + font.width(stats) + 6, 35, ColorUtil.YELLOW)
         }
 
-        graphics.enableScissor(listLeft, listTop, listRight, listBottom)
+        graphics.enableScissor(LIST_LEFT, LIST_TOP, listRight, listBottom)
+        graphics.fill(LIST_LEFT, LIST_TOP, LIST_LEFT + 1, listBottom, DIVIDER)
 
-        graphics.fill(listLeft, listTop, listLeft + 1, listBottom, 0x44FFFFFF)
-
-        var y = listTop - scrollOffset
-        for ((i, entry) in ChangelogLoader.data.entriesOrEmpty.withIndex()) {
-            if (y + slotHeight < listTop) { y += slotHeight; continue }
+        var y = LIST_TOP - smoothScroll.toInt()
+        for ((index, row) in rows.withIndex()) {
             if (y > listBottom) break
-            if (i == hoveredIndex) {
-                graphics.fill(listLeft, y, listRight, y + slotHeight, 0x33FFFFFF)
-            }
-            y = renderEntry(graphics, entry, y)
+            if (y + SLOT_HEIGHT >= LIST_TOP) renderRow(graphics, row, y, hovered = index == hoveredIndex)
+            y += SLOT_HEIGHT
         }
 
         graphics.disableScissor()
-
         renderScrollbar(graphics)
     }
 
-private fun renderEntry(graphics: GuiGraphicsExtractor, entry: ChangelogEntry, top: Int): Int {
-        var y = top
-        graphics.fill(20, y + 1, listRight, y + slotHeight - 1, 0x1AFFFFFF)
-        graphics.fill(20, y, 24, y + slotHeight, entry.parsedColor)
+    private fun renderRow(graphics: GuiGraphicsExtractor, row: Row, top: Int, hovered: Boolean) {
+        graphics.fill(
+            LIST_LEFT, top + 1, listRight, top + SLOT_HEIGHT - 1,
+            if (hovered) ROW_HOVERED else ROW_BACKGROUND
+        )
+        // 与磁贴背景保持同一垂直范围，否则色条上下各多出 1px，行与行之间会露出色带
+        graphics.fill(LIST_LEFT, top + 1, LIST_LEFT + 4, top + SLOT_HEIGHT - 1, row.entry.color)
 
-        val icon = ColorUtil.getTypeIcon(entry.primaryType)
-        val typeColor = ColorUtil.getTypeColor(entry.primaryType)
-        val versionText = "$icon ${entry.versionOrEmpty}"
-        graphics.text(font, versionText, 32, y + 4, typeColor)
+        graphics.text(font, row.versionText, TEXT_LEFT, top + 4, row.versionColor)
 
-        var tagX = 32 + font.width(versionText) + 6
-        for (tag in entry.typeOrEmpty) {
-            val tagName = ColorUtil.getTypeDisplayName(tag)
-            val tagW = font.width(tagName) + 6
-            graphics.fill(tagX, y + 3, tagX + tagW, y + 13, ColorUtil.getTypeColor(tag))
-            graphics.text(font, tagName, tagX + 3, y + 4, if (ColorUtil.isBright(ColorUtil.getTypeColor(tag))) 0xFF000000.toInt() else 0xFFFFFFFF.toInt())
-            tagX += tagW + 4
-        }
+        var badgeX = row.badgeX
+        for (badge in row.badges) badgeX = graphics.drawBadge(font, badge, badgeX, top + 3)
 
-        if (entry.dateOrEmpty.isNotBlank()) {
-            graphics.text(font, entry.dateOrEmpty, listRight - font.width(entry.dateOrEmpty), y + 4, 0xFFAAAAAA.toInt())
+        if (row.date.isNotBlank()) {
+            graphics.text(font, row.date, row.dateX, top + 4, ColorUtil.GREY)
         }
-        if (entry.titleOrEmpty.isNotBlank()) {
-            graphics.text(font, entry.titleOrEmpty, 32, y + 18, 0xFFDDDDDD.toInt())
+        if (row.title.isNotBlank()) {
+            graphics.text(font, row.title, TEXT_LEFT, top + 18, ColorUtil.LIGHT_GREY)
         }
-        if (entry.changesOrEmpty.isNotEmpty()) {
-            graphics.text(font, "• ${entry.changesOrEmpty.first().take(45)}", 32, y + 34, 0xFFAAAAAA.toInt())
+        if (row.summary.isNotBlank()) {
+            graphics.text(font, row.summary, TEXT_LEFT, top + 34, ColorUtil.GREY)
         }
-
-        y += slotHeight
-        return y
     }
 
-    override fun mouseClicked(event: net.minecraft.client.input.MouseButtonEvent, doubleClick: Boolean): Boolean {
+    private fun renderScrollbar(graphics: GuiGraphicsExtractor) {
+        if (maxScroll <= 0) return
+        val thumbHeight = (visibleHeight.toFloat() / totalContentHeight * visibleHeight).toInt().coerceAtLeast(10)
+        val thumbY = LIST_TOP + ((smoothScroll / maxScroll) * (visibleHeight - thumbHeight)).toInt()
+        graphics.fill(scrollBarLeft - 1, LIST_TOP, scrollBarLeft, listBottom, DIVIDER)
+        graphics.fill(scrollBarLeft, LIST_TOP, scrollBarRight, listBottom, SCROLL_TRACK)
+        graphics.fill(scrollBarLeft, thumbY, scrollBarRight, thumbY + thumbHeight, SCROLL_THUMB)
+    }
+
+    override fun mouseClicked(event: MouseButtonEvent, doubleClick: Boolean): Boolean {
         if (event.button() == 0) {
-            val idx = hitTestEntry(event.y.toInt())
-            if (idx >= 0) {
-                minecraft.setScreen(ChangelogDetailScreen(ChangelogLoader.data.entriesOrEmpty[idx], this))
+            val index = entryIndexAt(event.x.toInt(), event.y.toInt())
+            if (index >= 0) {
+                minecraft.setScreen(ChangelogDetailScreen(rows[index].entry, this))
                 return true
             }
         }
@@ -153,29 +243,25 @@ private fun renderEntry(graphics: GuiGraphicsExtractor, entry: ChangelogEntry, t
     }
 
     override fun mouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean {
-        targetScroll = (targetScroll - (scrollY * 20).toInt()).coerceIn(0, maxScroll)
+        targetScroll = (targetScroll - (scrollY * SCROLL_STEP).toInt()).coerceIn(0, maxScroll)
         return true
     }
 
-    override fun mouseMoved(mouseX: Double, mouseY: Double) {
-        hoveredIndex = hitTestEntry(mouseY.toInt())
-        super.mouseMoved(mouseX, mouseY)
+    /** 窗口尺寸或条目数量变化后，滚动位置可能越界 */
+    private fun clampScroll() {
+        targetScroll = targetScroll.coerceIn(0, maxScroll)
+        smoothScroll = smoothScroll.coerceIn(0f, maxScroll.toFloat())
     }
 
-    private fun hitTestEntry(mouseY: Int): Int {
-        if (mouseY !in listTop..<listBottom) return -1
-        val entryIndex = (mouseY - listTop + scrollOffset) / slotHeight
-        if (entryIndex < 0 || entryIndex >= ChangelogLoader.data.entriesOrEmpty.size) return -1
-        return entryIndex
+    private fun entryIndexAt(mouseX: Int, mouseY: Int): Int {
+        if (mouseX !in LIST_LEFT..listRight) return -1
+        if (mouseY !in LIST_TOP..<listBottom) return -1
+        val index = (mouseY - LIST_TOP + smoothScroll.toInt()) / SLOT_HEIGHT
+        return if (index in rows.indices) index else -1
     }
 
-    private fun renderScrollbar(graphics: GuiGraphicsExtractor) {
-        if (maxScroll <= 0) return
-        val barHeight = (visibleHeight.toFloat() / totalContentHeight * visibleHeight).toInt().coerceAtLeast(10)
-        val barY = listTop + ((smoothScroll / maxScroll) * (visibleHeight - barHeight)).toInt()
-        graphics.fill(scrollBarLeft - 1, listTop, scrollBarLeft, listBottom, 0x44FFFFFF)
-        graphics.fill(scrollBarLeft, listTop, scrollBarRight, listBottom, 0x33FFFFFF)
-        graphics.fill(scrollBarLeft, barY, scrollBarRight, barY + barHeight, 0xAAFFFFFF.toInt())
+    override fun onClose() {
+        minecraft.setScreen(parentScreen)
     }
 
     override fun isPauseScreen() = false

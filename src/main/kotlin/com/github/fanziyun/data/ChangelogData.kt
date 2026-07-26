@@ -2,16 +2,19 @@ package com.github.fanziyun.data
 
 import com.google.gson.annotations.SerializedName
 
+/**
+ * 更新日志文件的顶层结构。可空私有字段 + 非空属性的原因见 [ChangelogEntry]。
+ */
 data class ChangelogData(
-    @SerializedName("footer")
-    val footer: String? = null,
-
-    @SerializedName("tagColors")
-    val tagColors: Map<String, String>? = null,
-
-    @SerializedName("entries")
-    val entries: List<ChangelogEntry>? = null
+    @SerializedName("footer") private val rawFooter: String? = null,
+    @SerializedName("tagColors") private val rawTagColors: Map<String, String>? = null,
+    @SerializedName("entries") private val rawEntries: List<ChangelogEntry>? = null,
 ) {
-    val tagColorsOrEmpty: Map<String, String> get() = tagColors ?: emptyMap()
-    val entriesOrEmpty: List<ChangelogEntry> get() = entries ?: emptyList()
+    val footer: String get() = rawFooter.orEmpty()
+    val tagColors: Map<String, String> get() = rawTagColors.orEmpty()
+    val entries: List<ChangelogEntry> get() = rawEntries.orEmpty()
+
+    companion object {
+        val EMPTY = ChangelogData()
+    }
 }

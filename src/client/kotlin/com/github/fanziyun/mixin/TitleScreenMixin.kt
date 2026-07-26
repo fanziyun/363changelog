@@ -1,9 +1,9 @@
 package com.github.fanziyun.mixin
 
 import com.github.fanziyun.client.ChangelogClient
-import com.github.fanziyun.data.ChangelogLoader
 import com.github.fanziyun.data.VersionChecker
 import com.github.fanziyun.screen.ChangelogOverviewScreen
+import com.github.fanziyun.util.ColorUtil
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.Button
@@ -11,68 +11,61 @@ import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen
 import net.minecraft.network.chat.Component
 import org.spongepowered.asm.mixin.Mixin
-import org.spongepowered.asm.mixin.Unique
 import org.spongepowered.asm.mixin.injection.At
 import org.spongepowered.asm.mixin.injection.Inject
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 
+// 注入方法统一加 changelog363_ 前缀：TitleScreen 是热门 mixin 目标，
+// 通用名（onInit / onRender）容易和其他模组撞同名同签名的方法
 @Mixin(TitleScreen::class)
 abstract class TitleScreenMixin : Screen(Component.literal("")) {
 
-    @Unique
-    private var changelogButton: Button? = null
-
-    @Unique
-    private var hasUpdate = false
-
     @Inject(method = ["init"], at = [At("TAIL")])
-    fun onInit(callback: CallbackInfo) {
+    fun changelog363_addChangelogButton(callback: CallbackInfo) {
         val config = ChangelogClient.config ?: return
         if (!config.showOnTitle) return
 
+        // 只有第一次会真正发起网络请求；之后返回标题界面复用已有数据
+        ChangelogClient.ensureChangelogLoaded()
+
         val buttonY = height / 4 + 48 + 72 + 12 + 24
-
-        if (config.changelogUrl.isNotBlank()) {
-            ChangelogLoader.load(config.changelogUrl)
-            if (config.enableVersionCheck && config.modpackVersion.isNotBlank()) {
-                VersionChecker.checkAsync(config.modpackVersion)
-            }
-        }
-
-        val button = Button.builder(Component.translatable("menu.changelog363.button")) {
-            Minecraft.getInstance().setScreen(ChangelogOverviewScreen(Minecraft.getInstance().screen))
-        }.bounds(width / 2 - 100, buttonY, 200, 20).build()
-
-        changelogButton = button
-        addRenderableWidget(button)
-    }
-
-    @Inject(method = ["tick"], at = [At("TAIL")])
-    fun onTick(callback: CallbackInfo) {
-        if (VersionChecker.isDone) hasUpdate = VersionChecker.hasUpdate
+        addRenderableWidget(
+            Button.builder(Component.translatable("menu.changelog363.button")) {
+                Minecraft.getInstance().setScreen(ChangelogOverviewScreen(Minecraft.getInstance().screen))
+            }.bounds(width / 2 - 100, buttonY, 200, 20).build()
+        )
     }
 
     @Inject(method = ["extractRenderState"], at = [At("TAIL")])
-    fun onRender(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float, callback: CallbackInfo) {
+    fun changelog363_renderVersionLine(
+        graphics: GuiGraphicsExtractor,
+        mouseX: Int,
+        mouseY: Int,
+        partialTick: Float,
+        callback: CallbackInfo,
+    ) {
         val config = ChangelogClient.config ?: return
-        val packName = config.packName.ifBlank { null }
-        val versionPart = "v${config.modpackVersion}"
-        val white = 0xFF_FF_FF_FF.toInt()
-        val lineY = height - 20
 
-        val prefix = buildString {
-            if (packName != null) append(packName).append(' ')
-            append(versionPart)
-        }
-        val prefixWidth = font.width(prefix)
-        graphics.text(font, prefix, 2, lineY, white)
+        val label = listOfNotNull(config.packName.takeIf(String::isNotBlank), "v${config.modpackVersion}")
+            .joinToString(" ")
+        val lineY = height - config.versionYOffset
+        graphics.text(font, label, 2, lineY, ColorUtil.WHITE)
 
-        if (hasUpdate && VersionChecker.latestVersion.isNotBlank()) {
-            val status = " (新版本: v${VersionChecker.latestVersion})"
-            graphics.text(font, status, 2 + prefixWidth, lineY, 0xFF_FF_FF_55.toInt())
+        // 检测结束前不下结论，避免先显示"已是最新版本"再跳变成"有新版本"
+        if (!config.enableVersionCheck || !VersionChecker.isDone) return
+
+        val hasUpdate = VersionChecker.hasUpdate && VersionChecker.latestVersion.isNotBlank()
+        val status = if (hasUpdate) {
+            Component.translatable("screen.changelog363.update_available", VersionChecker.latestVersion)
         } else {
-            val status = " (已是最新版本)"
-            graphics.text(font, status, 2 + prefixWidth, lineY, 0xFF_55_FF_55.toInt())
+            Component.translatable("screen.changelog363.up_to_date")
         }
+        graphics.text(
+            font,
+            " ${status.string}",
+            2 + font.width(label),
+            lineY,
+            if (hasUpdate) ColorUtil.YELLOW else ColorUtil.GREEN,
+        )
     }
 }

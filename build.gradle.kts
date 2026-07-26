@@ -105,7 +105,8 @@ tasks.withType<KotlinCompile>().configureEach {
 }
 
 tasks.jar {
-    from("LICENSE") {
+    // 仓库里的文件名是 LICENSE.txt，写成 "LICENSE" 会静默匹配不到任何文件
+    from("LICENSE.txt") {
         rename { "${it}_${project.base.archivesName.get()}" }
     }
 }

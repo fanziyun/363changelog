@@ -16,17 +16,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 abstract class PauseScreenMixin : Screen(Component.literal("")) {
 
     @Inject(method = ["init"], at = [At("TAIL")])
-    fun onInit(callback: CallbackInfo) {
+    fun changelog363_addChangelogButton(callback: CallbackInfo) {
         val config = ChangelogClient.config ?: return
         if (!config.showOnTitle) return
 
-        val btnWidth = 204
-        val fullscreen = minecraft.window.isFullscreen
-        val btnY = if (fullscreen) height / 2 + 40 else height - 50
+        val buttonWidth = 204
+        val buttonY = if (minecraft.window.isFullscreen) height / 2 + 40 else height - 50
         addRenderableWidget(
             Button.builder(Component.translatable("menu.changelog363.button")) {
                 Minecraft.getInstance().setScreen(ChangelogOverviewScreen(Minecraft.getInstance().screen))
-            }.bounds((width - btnWidth) / 2, btnY, btnWidth, 20).build()
+            }.bounds((width - buttonWidth) / 2, buttonY, buttonWidth, 20).build()
         )
     }
 }

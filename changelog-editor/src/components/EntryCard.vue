@@ -18,10 +18,10 @@
             v-for="t in entry.type"
             :key="t"
             size="x-small"
-            :color="getTypeColor(t)"
+            :color="typeColor(t)"
             variant="flat"
             label
-          >{{ getTypeLabel(t) }}</v-chip>
+          >{{ typeLabel(t) }}</v-chip>
         </v-chip-group>
         <v-icon :icon="expanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" size="small" />
       </v-row>
@@ -30,7 +30,7 @@
     <!-- 展开: 完整编辑表单 -->
     <v-expand-transition>
       <v-card-text v-if="expanded">
-        <EntryEditor :entry="entry" :index="realIndex" />
+        <EntryEditor :entry="entry" />
         <div class="d-flex justify-space-between mt-4">
           <v-btn
             size="small"
@@ -61,7 +61,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { ChangelogEntry } from '../models/ChangelogData'
-import { TYPE_CHINESE, TYPE_COLORS } from '../models/constants'
+import { typeColor, typeLabel } from '../models/constants'
 import { useEditorStore } from '../stores/editor'
 import { parseToRgbHex } from '../utils/color'
 import EntryEditor from './EntryEditor.vue'
@@ -71,12 +71,4 @@ const editorStore = useEditorStore()
 const expanded = ref(false)
 
 const entryColor = computed(() => parseToRgbHex(props.entry.color || ''))
-
-function getTypeColor(t: string): string {
-  return TYPE_COLORS[t as keyof typeof TYPE_COLORS] || '#888888'
-}
-
-function getTypeLabel(t: string): string {
-  return TYPE_CHINESE[t as keyof typeof TYPE_CHINESE] || t
-}
 </script>

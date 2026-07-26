@@ -81,6 +81,7 @@ import { ref, onMounted } from 'vue'
 import { useGithubStore } from '../stores/github'
 import { useEditorStore } from '../stores/editor'
 import { getFile, listForks } from '../api/github'
+import { CHANGELOG_PATH } from '../models/constants'
 import { fromImportJson } from '../utils/json'
 import UploadDialog from './UploadDialog.vue'
 
@@ -107,7 +108,7 @@ async function handleFetchJson() {
   fetchingJson.value = true
   try {
     const [owner, repo] = githubStore.selectedFork.split('/')
-    const fileInfo = await getFile(githubStore.token, owner, repo, 'changelog.json')
+    const fileInfo = await getFile(githubStore.token, owner, repo, CHANGELOG_PATH)
     const data = fromImportJson(fileInfo.content)
     editorStore.importData(data)
     showToast('拉取成功')

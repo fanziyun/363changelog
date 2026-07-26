@@ -20,11 +20,11 @@
       :key="t"
       :value="t"
       filter
-      :color="getTypeColor(t)"
+      :color="typeColor(t)"
       :variant="selectedTypes.includes(t) ? 'flat' : 'outlined'"
       size="small"
       label
-    >{{ getTypeLabel(t) }}</v-chip>
+    >{{ typeLabel(t) }}</v-chip>
   </v-chip-group>
 
   <!-- Tags -->
@@ -60,31 +60,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, ref } from 'vue'
+import { computed } from 'vue'
 import type { ChangelogEntry } from '../models/ChangelogData'
-import { TYPE_OPTIONS, TYPE_CHINESE, TYPE_COLORS, type UpdateType } from '../models/constants'
+import { TYPE_OPTIONS, typeColor, typeLabel, type UpdateType } from '../models/constants'
 import { parseToRgbHex } from '../utils/color'
 
-const props = defineProps<{ entry: ChangelogEntry; index: number }>()
+const props = defineProps<{ entry: ChangelogEntry }>()
 
 const typeOptions = [...TYPE_OPTIONS]
-const selectedTypes = ref<UpdateType[]>([...props.entry.type])
 
-watch(selectedTypes, (val) => {
-  props.entry.type = [...val]
-}, { deep: true })
-
-watch(() => props.entry.type, (val) => {
-  selectedTypes.value = [...val]
+// 直接读写 entry.type。原来的两个互相赋值的 watch 每次都写入新数组，
+// 会让两个 watcher 反复互相触发。
+const selectedTypes = computed<UpdateType[]>({
+  get: () => props.entry.type,
+  set: (val) => { props.entry.type = [...val] },
 })
-
-function getTypeColor(t: string): string {
-  return TYPE_COLORS[t as keyof typeof TYPE_COLORS] || '#888888'
-}
-
-function getTypeLabel(t: string): string {
-  return TYPE_CHINESE[t as keyof typeof TYPE_CHINESE] || t
-}
 
 function onTagsChange(val: string) {
   props.entry.tags = val.split(',').map(s => s.trim()).filter(s => s)

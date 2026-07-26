@@ -1,90 +1,85 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
+/**
+ * GitHub API 服务端转发。
+ *
+ * 前端目前直接用 Octokit 访问 api.github.com，并没有调用这个端点；保留它是为了
+ * 需要走服务端转发时可以直接切换。
+ *
+ * 这里刻意不返回 `Access-Control-Allow-Origin`：这个端点会带着调用方的 token 去请求
+ * GitHub，放开跨域等于把自己的部署变成任何站点都能用的 GitHub API 中转。
+ * 前端与它同源部署，本就不需要 CORS。
+ */
+
 const GITHUB_API = 'https://api.github.com'
+const GITHUB_ACCEPT = 'application/vnd.github+json'
 
-const ALLOW_ORIGIN = '*'
-const ALLOW_METHODS = 'GET, PUT, OPTIONS'
-const ALLOW_HEADERS = 'Authorization, Content-Type'
-
-function setCorsHeaders(res: VercelResponse): VercelResponse {
-  res.setHeader('Access-Control-Allow-Origin', ALLOW_ORIGIN)
-  res.setHeader('Access-Control-Allow-Methods', ALLOW_METHODS)
-  res.setHeader('Access-Control-Allow-Headers', ALLOW_HEADERS)
-  return res
+/** 只接受以单个 / 开头的 API 路径，避免被改写成任意 host 或穿越目录 */
+function normalizePath(path: unknown): string | null {
+  if (typeof path !== 'string') return null
+  if (!path.startsWith('/') || path.startsWith('//') || path.includes('..')) return null
+  return path
 }
 
-async function handler(
-  req: VercelRequest,
-  res: VercelResponse,
-): Promise<void> {
-  setCorsHeaders(res)
+function bearerToken(req: VercelRequest): string | null {
+  const header = req.headers.authorization
+  return header?.startsWith('Bearer ') ? header : null
+}
 
-  // CORS preflight
-  if (req.method === 'OPTIONS') {
-    res.status(200).end()
-    return
-  }
-
-  const token = req.headers.authorization
-  if (!token || !token.startsWith('Bearer ')) {
+export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const token = bearerToken(req)
+  if (!token) {
     res.status(401).json({ message: 'Missing or invalid Authorization header' })
     return
   }
 
   try {
     if (req.method === 'GET') {
-      const path = req.query.path as string | undefined
+      const path = normalizePath(req.query.path)
       if (!path) {
-        res.status(400).json({ message: 'Missing query parameter: path' })
+        res.status(400).json({ message: 'Missing or invalid query parameter: path' })
         return
       }
 
-      const url = `${GITHUB_API}${path}`
-      const response = await fetch(url, {
-        headers: { Authorization: token },
+      const response = await fetch(`${GITHUB_API}${path}`, {
+        headers: { Authorization: token, Accept: GITHUB_ACCEPT },
       })
-
-      const body = await response.json()
-      res.status(response.status).json(body)
+      res.status(response.status).json(await response.json())
       return
     }
 
     if (req.method === 'PUT') {
-      const { path, owner, repo, content, sha, message } = req.body
-
-      if (!path || !owner || !repo || !content) {
-        res.status(400).json({
-          message: 'Missing required fields: path, owner, repo, content',
-        })
+      const { path, owner, repo, content, sha, message } = req.body ?? {}
+      if (!path || !owner || !repo || typeof content !== 'string') {
+        res.status(400).json({ message: 'Missing required fields: path, owner, repo, content' })
         return
       }
 
-      const url = `${GITHUB_API}/repos/${owner}/${repo}/contents/${path}`
       const body: Record<string, unknown> = {
         message: message ?? `Update ${path}`,
-        content: btoa(content),
+        // btoa 只支持 Latin-1，中文更新日志会直接抛 InvalidCharacterError
+        content: Buffer.from(content, 'utf-8').toString('base64'),
       }
       if (sha) body.sha = sha
 
-      const response = await fetch(url, {
+      const response = await fetch(`${GITHUB_API}/repos/${owner}/${repo}/contents/${path}`, {
         method: 'PUT',
         headers: {
           Authorization: token,
           'Content-Type': 'application/json',
+          Accept: GITHUB_ACCEPT,
         },
         body: JSON.stringify(body),
       })
-
-      const responseBody = await response.json()
-      res.status(response.status).json(responseBody)
+      res.status(response.status).json(await response.json())
       return
     }
 
-    // Method not allowed
+    res.setHeader('Allow', 'GET, PUT')
     res.status(405).json({ message: `Method ${req.method} not allowed` })
   } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : 'Internal server error'
-    res.status(500).json({ message })
+    res.status(502).json({
+      message: error instanceof Error ? error.message : 'Upstream request failed',
+    })
   }
 }
