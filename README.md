@@ -1,32 +1,51 @@
 # 363Changelog
 
-一个 Minecraft Fabric 模组，用于在主菜单和世界选择界面展示整合包更新日志，支持远程获取与版本检测。
+一个 Minecraft 模组，在主菜单与暂停界面展示整合包更新日志，支持远程获取与版本检测。
+**Fabric 版**（Minecraft 1.20.1）。
+
+## 安装 / Installation
+
+| 加载器 | 必需前置 |
+|--------|----------|
+| **Fabric** | [Fabric API](https://modrinth.com/mod/fabric-api) · [Fabric Language Kotlin](https://modrinth.com/mod/fabric-language-kotlin) · [Cloth Config](https://modrinth.com/mod/cloth-config) · [Mod Menu](https://modrinth.com/mod/modmenu) |
+
+模组是纯客户端的，装在服务端没有意义。
 
 ## 配置说明
 
-配置文件由 Cloth Config 管理，可在游戏内 ModMenu → 363Changelog 中修改。
+配置文件由 Cloth Config 管理，从游戏内 ModMenu → 363Changelog 进入。
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `changelogUrl` | String | `""` | 远程 JSON 更新日志文件的 URL。 |
-| `modpackVersion` | String | `"1.0.0"` | 当前整合包版本号，用于与远程最新版本对比。 |
+| `changelogUrl` | String | 见下方说明 | 远程 JSON 更新日志文件的 URL。**必须直接返回 JSON**（如 `raw.githubusercontent.com/...`），GitHub 的 `blob/` 网页链接返回的是 HTML，无法解析。 |
+| `packName` | String | `"363Changelog"` | 主菜单左下角显示的整合包名称。留空则只显示版本号。 |
+| `modpackVersion` | String | `"1.1.0"` | 当前整合包版本号，用于与更新日志中的最高版本对比。默认值与内置 [changelog.json](src/main/resources/changelog.json) 的最新条目保持一致。 |
 | `showOnTitle` | Boolean | `true` | 是否在主菜单和暂停界面显示"更新日志"按钮。 |
 | `enableVersionCheck` | Boolean | `true` | 是否启用自动版本检测，检测到新版本时显示提示。 |
-| `versionYOffset` | Int | `20` | 主菜单版本文字（`v1.0.0`）的 Y 轴偏移量。 |
-| `externalLinkName` | String | `"项目主页"` | 外部链接按钮的显示名称。 |
-| `externalLinkUrl` | String | `"https://github.com/FanZiyun"` | 外部链接按钮的目标 URL。 |
+| `versionYOffset` | Int | `20` | 主菜单版本文字距屏幕底部的像素距离。 |
+| `externalLinkName` | String | `"项目主页"` | 外部链接按钮的显示名称。留空则不显示该按钮。 |
+| `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | 外部链接按钮的目标 URL。 |
+
+`changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/1.20.1-fabric/src/main/resources/changelog.json`
+
+数据来源按 **远程 URL → 本地缓存 → 模组内置 changelog.json** 的顺序回退，任一环节成功即停止；
+远程请求会带 `If-None-Match`，命中 304 时直接复用本地缓存。
 
 ### English
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `changelogUrl` | String | `""` | URL of the remote JSON changelog file. |
-| `modpackVersion` | String | `"1.0.0"` | Current modpack version, used to compare with remote version for update checks. |
+| `changelogUrl` | String | see above | URL of the remote JSON changelog. **Must return raw JSON** — a GitHub `blob/` page returns HTML and will fail to parse. |
+| `packName` | String | `"363Changelog"` | Modpack name shown in the bottom-left of the title screen. Leave blank to show only the version. |
+| `modpackVersion` | String | `"1.1.0"` | Current modpack version, compared against the highest version in the changelog. Matches the newest entry in the bundled `changelog.json`. |
 | `showOnTitle` | Boolean | `true` | Show the "Changelog" button on the title screen and pause screen. |
 | `enableVersionCheck` | Boolean | `true` | Enable automatic version checking. Displays an indicator when a new version is available. |
-| `versionYOffset` | Int | `20` | Y offset of the version text on the title screen. |
-| `externalLinkName` | String | `"Homepage"` | Display name for the external link button. |
-| `externalLinkUrl` | String | `"https://github.com/FanZiyun"` | Target URL for the external link button. |
+| `versionYOffset` | Int | `20` | Distance in pixels between the version text and the bottom of the title screen. |
+| `externalLinkName` | String | `"项目主页"` | Display name for the external link button. Leave blank to hide the button. |
+| `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | Target URL for the external link button. |
+
+Sources fall back in order: **remote URL → local cache → bundled `changelog.json`**, stopping at the first success.
+Remote requests send `If-None-Match`, so a 304 reuses the local cache.
 
 ---
 
@@ -44,7 +63,7 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `version` | String | **是** | 版本标识符（如 `"1.2.0"`）。 |
+| `version` | String | **是** | 版本标识符（如 `"1.2.0"`）。版本检测按语义化版本比较，取所有条目中最高的一个，与书写顺序无关。 |
 | `date` | String | 否 | 发布日期（格式自由，建议 ISO 8601）。 |
 | `title` | String | 否 | 版本标题/名称。 |
 | `type` | String[] | 否 | 更新类型标签。可选值：`major`（重大更新）、`minor`（功能更新）、`patch`（修复补丁）、`hotfix`（热修复）、`danger`（危险更新）。每种类型自带图标与颜色，不可自定义。 |
@@ -97,20 +116,80 @@
 cd changelog-editor
 npm install
 npm run dev      # 启动开发服务器
-npm run build    # 构建生产版本
+npm run build    # 类型检查 + 构建生产版本
 ```
+
+编辑器可以纯本地使用（导入/导出 JSON 文件），草稿会自动存在浏览器 `localStorage` 里。
+
+### GitHub 登录（可选）
+
+想直接从 fork 仓库拉取/提交 `changelog.json`，需要配一个 GitHub OAuth App：
+
+1. 复制 `.env.example` 为 `.env`，填入 OAuth App 的 Client ID 与 Client Secret；
+2. OAuth App 的 Authorization callback URL 填 `<部署地址>/callback`；
+3. `api/oauth-callback.ts` 是 Vercel Serverless 函数，负责用 `code` 换 `access_token`
+   （Client Secret 不能放在前端，所以这一步必须走服务端）。
+
+| 变量 | 位置 | 说明 |
+|------|------|------|
+| `VITE_GITHUB_CLIENT_ID` | 前端 + 服务端 | OAuth App 的 Client ID（公开信息） |
+| `GITHUB_CLIENT_SECRET` | 仅服务端 | OAuth App 的 Client Secret，不要提交到仓库 |
+
+access_token 只保存在 `sessionStorage`，关闭标签页即失效。
+读写的仓库路径由 `src/models/constants.ts` 中的 `CHANGELOG_PATH` 决定，
+需与 `changelogUrl` 指向同一个文件。
 
 ---
 
 ## 开发 / Development
 
-```bash
-# Mod
-./gradlew runClient    # 启动 Minecraft 开发实例
-./gradlew build        # 编译 + 重混淆 JAR
-./gradlew clean        # 清理构建产物
+### 项目结构
 
-# Changelog 编辑器
+用 Fabric Loom 的**分环境源码集**（split environment source sets）：
+
+```
+src/main/     与端无关的代码：数据层、工具、内置 changelog.json、语言文件
+src/client/   仅客户端的代码：两个界面、两个 mixin、配置类、ModMenu 集成
+```
+
+Minecraft 1.20.1 用官方（Mojang）映射编译，Loom 负责运行时的名字映射，
+无需手动重混淆产物。
+
+Mixin 分两份：`src/main/resources/changelog363.mixins.json` 与
+仅客户端的 `src/client/resources/changelog363.client.mixins.json`，
+两者都在 `fabric.mod.json` 里声明。
+
+### 常用命令
+
+```bash
+./gradlew build        # 编译 + 打包 jar
+./gradlew runClient    # 启动 Fabric 开发实例
+./gradlew clean        # 清理构建产物
+```
+
+产物在 `build/libs/`（不带 `-sources` 后缀的即为正式产物）。
+
+> 首次构建会下载并反编译 Minecraft，耗时较长，属正常现象。
+> 构建需要 JDK 17。
+
+### 版本对照
+
+所有版本号集中在 [gradle.properties](gradle.properties)：
+
+| 组件 | 版本 |
+|------|------|
+| Minecraft | 1.20.1 |
+| Fabric Loom | 1.9.1 |
+| Fabric Loader | 0.19.3 |
+| Fabric API | 0.92.9+1.20.1 |
+| Fabric Language Kotlin | 1.13.11+kotlin.2.3.21 |
+| Kotlin | 2.3.21 |
+| Cloth Config | 11.1.136 |
+| Mod Menu | 7.2.2 |
+
+### Changelog 编辑器
+
+```bash
 cd changelog-editor && npm run dev
 cd changelog-editor && npm run build
 ```
