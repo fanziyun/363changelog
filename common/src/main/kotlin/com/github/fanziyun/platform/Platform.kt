@@ -8,7 +8,7 @@ interface Platform {
 
     companion object {
         val INSTANCE: Platform by lazy {
-            ServiceLoader.load(Platform::class.java).findFirst().orElseThrow {
+            ServiceLoader.load(Platform::class.java, Platform::class.java.classLoader).findFirst().orElseThrow {
                 IllegalStateException("No Platform implementation found")
             }
         }

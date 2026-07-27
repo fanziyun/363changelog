@@ -141,6 +141,7 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
     }
 
     override fun render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
+        renderBackground(graphics)
         super.render(graphics, mouseX, mouseY, partialTick)
 
         clampScroll()

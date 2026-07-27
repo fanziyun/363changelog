@@ -3,6 +3,13 @@ plugins {
     id("net.minecraftforge.gradle")
 }
 
+repositories {
+    maven("https://thedarkcolour.github.io/KotlinForForge/")
+    maven("https://maven.shedaniel.me/")
+    maven("https://maven.minecraftforge.net/")
+    maven("https://libraries.minecraft.net/")
+}
+
 base.archivesName.set("${rootProject.property("archives_base_name")}-forge")
 
 val common = project(":common")
@@ -53,8 +60,14 @@ tasks.processResources {
 }
 
 tasks.named<Jar>("jar") {
+    // Forge 1.20.1 discovers mixin configs from the MixinConfigs manifest attribute
+    // (it does NOT read [[mixins]] from mods.toml — that is NeoForge-only). The static
+    // META-INF/MANIFEST.MF in resources covers the dev run; exclude it here so the jar's
+    // own generated manifest (below) is the single source in the packaged jar.
+    exclude("META-INF/MANIFEST.MF")
     manifest {
         attributes(
+            "MixinConfigs" to "${modId}.mixins.json",
             "Specification-Title" to modId,
             "Specification-Vendor" to rootProject.property("mod_author"),
             "Implementation-Title" to project.name,

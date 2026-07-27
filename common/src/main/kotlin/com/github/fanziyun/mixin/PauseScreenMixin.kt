@@ -9,7 +9,6 @@ import net.minecraft.client.gui.screens.PauseScreen
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.network.chat.Component
 import org.spongepowered.asm.mixin.Mixin
-import org.spongepowered.asm.mixin.Shadow
 import org.spongepowered.asm.mixin.injection.At
 import org.spongepowered.asm.mixin.injection.Inject
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
@@ -18,15 +17,10 @@ private const val BUTTON_WIDTH = 204
 
 @Mixin(PauseScreen::class)
 abstract class PauseScreenMixin : Screen(Component.literal("")) {
-
-    @Shadow
-    abstract fun showsPauseMenu(): Boolean
-
     @Inject(method = ["init"], at = [At("TAIL")])
     fun changelog363_addChangelogButton(callback: CallbackInfo) {
         val config = ChangelogService.config ?: return
         if (!config.showOnTitle) return
-        if (!showsPauseMenu()) return
 
         ChangelogService.ensureChangelogLoaded()
 
@@ -40,4 +34,3 @@ abstract class PauseScreenMixin : Screen(Component.literal("")) {
         )
     }
 }
-

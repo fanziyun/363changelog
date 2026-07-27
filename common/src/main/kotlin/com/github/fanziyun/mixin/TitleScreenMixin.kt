@@ -70,4 +70,3 @@ abstract class TitleScreenMixin : Screen(Component.literal("")) {
         )
     }
 }
-

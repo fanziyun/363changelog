@@ -7,6 +7,9 @@
 # Gradle build folder
 build
 
+# Kotlin incremental compilation / error logs
+.kotlin/
+
 # IntelliJ
 out/
 .idea
