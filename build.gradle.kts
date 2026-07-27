@@ -1,9 +1,9 @@
-﻿import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "2.3.21"
-    id("fabric-loom") version "1.5.8"
+    id("fabric-loom") version "1.9.1"
     id("maven-publish")
 }
 
@@ -20,21 +20,16 @@ java {
     withSourcesJar()
 }
 
-// Define client source set manually (Loom 1.5.x compat without splitEnvironmentSourceSets)
-val client by sourceSets.creating {
-    compileClasspath += sourceSets.main.get().output + sourceSets.main.get().compileClasspath
-    runtimeClasspath += sourceSets.main.get().output + sourceSets.main.get().runtimeClasspath
-}
-
 loom {
+    splitEnvironmentSourceSets()
+
     mods {
         register("changelog363") {
-            sourceSet("main")
-            sourceSet("client")
+            sourceSet(sourceSets.main.get())
+            sourceSet(sourceSets.getByName("client"))
         }
     }
 }
-
 fabricApi {
 }
 
@@ -53,27 +48,20 @@ repositories {
 
 dependencies {
     minecraft("com.mojang:minecraft:${project.property("minecraft_version")}")
-    mappings("net.fabricmc:yarn:1.20.1+build.9")
+    mappings(loom.officialMojangMappings())
 
-    val sharedDeps = listOf(
-        "net.fabricmc:fabric-loader:${project.property("loader_version")}",
-        "net.fabricmc:fabric-language-kotlin:${project.property("kotlin_loader_version")}",
-        "net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}",
-        "com.google.code.gson:gson:2.14.0"
-    )
-
-    sharedDeps.forEach { dep ->
-        implementation(dep)
-        add("clientImplementation", dep)
-    }
+    modImplementation("net.fabricmc:fabric-loader:${project.property("loader_version")}")
+    modImplementation("net.fabricmc:fabric-language-kotlin:${project.property("kotlin_loader_version")}")
+    modImplementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
+    implementation("com.google.code.gson:gson:2.14.0")
 
     val clothConfig = "me.shedaniel.cloth:cloth-config-fabric:${project.property("cloth_config_version")}"
-    implementation(clothConfig) { exclude(group = "net.fabricmc.fabric-api") }
-    add("clientImplementation", clothConfig) { exclude(group = "net.fabricmc.fabric-api") }
+    modImplementation(clothConfig) {
+        exclude(group = "net.fabricmc.fabric-api")
+    }
 
     val modMenu = "maven.modrinth:modmenu:${project.property("modmenu_version")}"
-    implementation(modMenu)
-    add("clientImplementation", modMenu)
+    modImplementation(modMenu)
 }
 
 tasks.processResources {

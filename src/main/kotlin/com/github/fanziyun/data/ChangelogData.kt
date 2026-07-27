@@ -3,15 +3,15 @@ package com.github.fanziyun.data
 import com.google.gson.annotations.SerializedName
 
 data class ChangelogData(
-    @SerializedName("footer")
-    val footer: String? = null,
-
-    @SerializedName("tagColors")
-    val tagColors: Map<String, String>? = null,
-
-    @SerializedName("entries")
-    val entries: List<ChangelogEntry>? = null
+    @SerializedName("footer") private val rawFooter: String? = null,
+    @SerializedName("tagColors") private val rawTagColors: Map<String, String>? = null,
+    @SerializedName("entries") private val rawEntries: List<ChangelogEntry>? = null,
 ) {
-    val tagColorsOrEmpty: Map<String, String> get() = tagColors ?: emptyMap()
-    val entriesOrEmpty: List<ChangelogEntry> get() = entries ?: emptyList()
+    val footer: String get() = rawFooter.orEmpty()
+    val tagColors: Map<String, String> get() = rawTagColors.orEmpty()
+    val entries: List<ChangelogEntry> get() = rawEntries.orEmpty()
+
+    companion object {
+        val EMPTY = ChangelogData()
+    }
 }

@@ -1,4 +1,4 @@
-﻿package com.github.fanziyun.screen
+package com.github.fanziyun.screen
 
 import com.github.fanziyun.data.ChangelogEntry
 import com.github.fanziyun.data.ChangelogLoader
@@ -10,57 +10,90 @@ import net.minecraft.network.chat.Component
 
 class ChangelogDetailScreen(
     private val entry: ChangelogEntry,
-    private val parentScreen: Screen?
-) : Screen(Component.literal("${entry.versionOrEmpty} - ${entry.titleOrEmpty}")) {
+    private val parentScreen: Screen?,
+) : Screen(Component.literal(headline(entry))) {
+
+    private companion object {
+        const val CONTENT_LEFT = 30
+        const val BADGES_TOP = 50
+        const val CHANGES_TOP = 65
+        const val LINE_HEIGHT = 12
+        const val BOTTOM_MARGIN = 40
+        const val BULLET = "• "
+
+        fun headline(entry: ChangelogEntry): String =
+            listOf(entry.version, entry.title).filter(String::isNotBlank).joinToString(" - ")
+    }
+
+    private class Line(val text: String, val indent: Int)
+
+    private var lines: List<Line> = emptyList()
+    private var badges: List<Badge> = emptyList()
+    private var headlineText: String = ""
 
     override fun init() {
         super.init()
         addRenderableWidget(
             Button.builder(Component.translatable("gui.back")) { onClose() }
-                .bounds(width / 2 - 50, height - 30, 100, 20).build()
+                .bounds(width / 2 - 50, height - 30, 100, 20)
+                .build()
         )
+
+        val contentWidth = width - CONTENT_LEFT * 2
+        headlineText = font.ellipsize(title.string, contentWidth)
+        badges = font.fitBadges(
+            badgesOf(entry, ChangelogLoader.data.tagColors),
+            startX = 0,
+            limitX = contentWidth,
+        )
+
+        val bulletWidth = font.width(BULLET)
+        val textWidth = contentWidth - bulletWidth
+        lines = entry.changes.flatMap { change ->
+            font.wrap(change, textWidth).mapIndexed { index, part ->
+                if (index == 0) Line(BULLET + part, 0) else Line(part, bulletWidth)
+            }
+        }
     }
 
     override fun render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
         super.render(graphics, mouseX, mouseY, partialTick)
 
-        val titleText = "${entry.versionOrEmpty} - ${entry.titleOrEmpty}"
-        graphics.drawString(font, titleText, width / 2 - font.width(titleText) / 2, 20, entry.parsedColor)
+        graphics.drawString(font, headlineText, (width - font.width(headlineText)) / 2, 20, entry.color)
 
-        if (entry.dateOrEmpty.isNotBlank()) {
-            val dateText = "日期: ${entry.dateOrEmpty}"
-            graphics.drawString(font, dateText, width / 2 - font.width(dateText) / 2, 35, 0xFFAAAAAA.toInt())
+        if (entry.date.isNotBlank()) {
+            val dateText = Component.translatable("screen.changelog363.date", entry.date).string
+            graphics.drawString(font, dateText, (width - font.width(dateText)) / 2, 35, ColorUtil.GREY)
         }
 
-        renderTags(graphics, 50)
+        renderBadges(graphics, BADGES_TOP)
 
-        var y = 65
-        for (change in entry.changesOrEmpty) {
-            if (y > height - 40) break
-            graphics.drawString(font, "• $change", 30, y, 0xFFDDDDDD.toInt())
-            y += 12
-        }
-    }
+        val capacity = ((height - BOTTOM_MARGIN - CHANGES_TOP) / LINE_HEIGHT).coerceAtLeast(0)
+        val truncated = lines.size > capacity
+        val shown = if (truncated) (capacity - 1).coerceAtLeast(0) else lines.size
 
-    private fun renderTags(graphics: GuiGraphics, y: Int) {
-        val tags = mutableListOf<Pair<String, Int>>()
-        for (t in entry.typeOrEmpty) tags.add(ColorUtil.getTypeDisplayName(t, true) to ColorUtil.getTypeColor(t))
-        for (t in entry.tagsOrEmpty) {
-            val c = ColorUtil.parseColor(ChangelogLoader.data.tagColorsOrEmpty[t] ?: "#888888", 0xFF888888.toInt())
-            tags.add(t to c)
+        var y = CHANGES_TOP
+        for (index in 0 until shown) {
+            val line = lines[index]
+            graphics.drawString(font, line.text, CONTENT_LEFT + line.indent, y, ColorUtil.LIGHT_GREY)
+            y += LINE_HEIGHT
         }
-        if (tags.isEmpty()) return
-        val totalW = tags.sumOf { font.width(it.first) + 10 }
-        var x = (width - totalW) / 2
-        for ((text, color) in tags) {
-            val w = font.width(text) + 6
-            graphics.fill(x, y - 1, x + w, y + 9, color)
-            val textColor = if (ColorUtil.isBright(color)) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
-            graphics.drawString(font, text, x + 3, y, textColor)
-            x += w + 4
+
+        if (truncated) {
+            val more = Component.translatable("screen.changelog363.more", lines.size - shown).string
+            graphics.drawString(font, font.ellipsize(more, width - CONTENT_LEFT * 2), CONTENT_LEFT, y, ColorUtil.GREY)
         }
     }
 
-    override fun onClose() { minecraft.setScreen(parentScreen) }
+    private fun renderBadges(graphics: GuiGraphics, y: Int) {
+        if (badges.isEmpty()) return
+        var x = (width - font.badgeRowWidth(badges)) / 2
+        for (badge in badges) x = graphics.drawBadge(font, badge, x, y)
+    }
+
+    override fun onClose() {
+        minecraft?.setScreen(parentScreen)
+    }
+
     override fun isPauseScreen() = false
 }
