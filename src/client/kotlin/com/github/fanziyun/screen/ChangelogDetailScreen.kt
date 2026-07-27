@@ -57,6 +57,7 @@ class ChangelogDetailScreen(
     }
 
     override fun render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
+        renderBackground(graphics)
         super.render(graphics, mouseX, mouseY, partialTick)
 
         graphics.drawString(font, headlineText, (width - font.width(headlineText)) / 2, 20, entry.color)
