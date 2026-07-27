@@ -1,21 +1,19 @@
 # 363Changelog
 
 一个 Minecraft 模组，在主菜单与暂停界面展示整合包更新日志，支持远程获取与版本检测。
-**同时支持 Fabric 与 NeoForge**（Minecraft 26.1.2）。
+**Forge 版**（Minecraft 1.20.1）。
 
 ## 安装 / Installation
 
 | 加载器 | 必需前置 |
 |--------|----------|
-| **Fabric** | [Fabric API](https://modrinth.com/mod/fabric-api) · [Fabric Language Kotlin](https://modrinth.com/mod/fabric-language-kotlin) · [Cloth Config](https://modrinth.com/mod/cloth-config) · [Mod Menu](https://modrinth.com/mod/modmenu) |
-| **NeoForge** | [Kotlin for Forge](https://www.curseforge.com/minecraft/mc-mods/kotlin-for-forge) · [Cloth Config](https://modrinth.com/mod/cloth-config) |
+| **Forge** | [Kotlin for Forge](https://www.curseforge.com/minecraft/mc-mods/kotlin-for-forge) · [Cloth Config](https://modrinth.com/mod/cloth-config) |
 
 模组是纯客户端的，装在服务端没有意义。
 
 ## 配置说明
 
-配置文件由 Cloth Config 管理。Fabric 上从 ModMenu → 363Changelog 进入，
-NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个界面。
+配置文件由 Cloth Config 管理，从游戏内模组列表里的"配置"按钮进入。
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -28,7 +26,7 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `externalLinkName` | String | `"项目主页"` | 外部链接按钮的显示名称。留空则不显示该按钮。 |
 | `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | 外部链接按钮的目标 URL。 |
 
-`changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/26.1.2/common/src/main/resources/changelog.json`
+`changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/1.20.1-forge/common/src/main/resources/changelog.json`
 
 数据来源按 **远程 URL → 本地缓存 → 模组内置 changelog.json** 的顺序回退，任一环节成功即停止；
 远程请求会带 `If-None-Match`，命中 304 时直接复用本地缓存。
@@ -148,37 +146,36 @@ access_token 只保存在 `sessionStorage`，关闭标签页即失效。
 ### 项目结构
 
 ```
-common/     与加载器无关的全部代码：数据层、工具、两个界面、两个 mixin、配置类
-fabric/     Fabric 入口点 + ModMenu 集成 + Platform 实现
-neoforge/   NeoForge 入口点 + 配置界面注册 + Platform 实现
+common/   与加载器无关的全部代码：数据层、工具、两个界面、两个 mixin、配置类
+forge/    Forge 入口点 + 配置界面注册 + Platform 实现
 ```
 
-`common` 用 ModDevGradle 的 **NeoForm 模式**编译，只对着原版 Minecraft，不带任何加载器。
-两个加载器子项目**直接把 `common` 的源码编进各自的 jar**（`kotlin.srcDir`），
-不依赖 `common` 的产物 —— Minecraft 从 26.1 起不再混淆，两边引用的是同一套官方名字，
-所以共享源码不需要任何重映射中间层。
+`forge` 子项目**直接把 `common` 的源码与资源编进自己的 jar**（`kotlin.srcDir` / `resources.srcDir`），
+不依赖 `common` 的产物（`common` 的 `jar` 任务被禁用）。
+Minecraft 1.20.1 仍是混淆的，所以 `forge` 用官方（`official`）映射编译，
+再由 ForgeGradle 的 `reobfJar` 把产物重混淆回运行时名字。
 
 平台差异只有一处：[`Platform`](common/src/main/kotlin/com/github/fanziyun/platform/Platform.kt)
-接口的 `gameDir`（缓存目录），由各子项目通过 `META-INF/services` 注册实现。
+接口的 `gameDir`（缓存目录），由 `forge` 子项目通过 `META-INF/services` 注册实现。
 
-Mixin 也放在 `common`：Fabric 与 NeoForge 都内置 Fabric Mixin，
-两边各自在 `fabric.mod.json` / `neoforge.mods.toml` 里声明同一个 `changelog363.mixins.json`。
+Mixin 放在 `common`，配置文件为 `changelog363.mixins.json`。
+Forge 1.20.1 从 jar 的 `MixinConfigs` **manifest 属性**里发现 mixin 配置
+（它**不读** `mods.toml` 里的 `[[mixins]]`，那是 NeoForge 才有的），
+所以打包时由 `jar` 任务写入该属性。
 
 ### 常用命令
 
 ```bash
-./gradlew build                 # 构建两个 jar
-./gradlew :fabric:build         # 只构建 Fabric
-./gradlew :neoforge:build       # 只构建 NeoForge
-./gradlew :fabric:runClient     # 启动 Fabric 开发实例
-./gradlew :neoforge:runClient   # 启动 NeoForge 开发实例
-./gradlew clean                 # 清理构建产物
+./gradlew build              # 构建 jar
+./gradlew :forge:build       # 只构建 Forge 子项目
+./gradlew :forge:runClient   # 启动 Forge 开发实例
+./gradlew clean              # 清理构建产物
 ```
 
-产物分别在 `fabric/build/libs/` 与 `neoforge/build/libs/`。
+产物在 `forge/build/libs/`（认准经过 `reobfJar` 的正式产物，而非 `-dev` 结尾的开发用 jar）。
 
-> 首次构建会下载并反编译 Minecraft，耗时可能超过半小时，属正常现象。
-> 构建需要 JDK 25；本机没装的话 `settings.gradle.kts` 里的 foojay resolver 会自动下载。
+> 首次构建会下载并反编译 Minecraft，耗时较长，属正常现象。
+> 构建需要 JDK 17；本机没装的话 `settings.gradle.kts` 里的 foojay resolver 会自动下载。
 
 ### 版本对照
 
@@ -186,15 +183,13 @@ Mixin 也放在 `common`：Fabric 与 NeoForge 都内置 Fabric Mixin，
 
 | 组件 | 版本 |
 |------|------|
-| Minecraft | 26.1.2 |
-| Fabric Loom / ModDevGradle | 1.15.5 / 2.0.141 |
-| NeoForm（common 用） | 26.1.2-1 |
-| NeoForge | 26.1.2.87 |
+| Minecraft | 1.20.1 |
+| ForgeGradle | 6.0.36 |
+| Forge | 1.20.1-47.4.0 |
 | Kotlin | 2.3.21 |
-
-> Kotlin for Forge 6.2.0 内置的 Kotlin 标准库是 **2.3.10**，而本项目用 2.3.21 编译。
-> 同一 minor 内标准库 API 兼容，本模组也只用了长期稳定的 API，所以没问题；
-> 但如果将来用到 2.3.11+ 才引入的标准库 API，就需要换用绑定了对应版本的语言提供者。
+| Kotlin for Forge | 4.12.0 |
+| Cloth Config | 11.1.136 |
+| Mixin | 0.8.5 |
 
 ### Changelog 编辑器
 
