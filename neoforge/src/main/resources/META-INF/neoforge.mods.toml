@@ -43,7 +43,7 @@ side = "CLIENT"
 [[dependencies.${mod_id}]]
 modId = "cloth_config"
 type = "required"
-# Cloth 的 NeoForge 构建自报版本形如 26.1.154
+# n
 versionRange = "[${cloth_config_version},)"
 ordering = "AFTER"
 side = "CLIENT"

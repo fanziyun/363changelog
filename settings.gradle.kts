@@ -13,8 +13,6 @@ pluginManagement {
 }
 
 plugins {
-    // 本机没装 Java 25 时自动下载对应的 toolchain，
-    // 否则 java_version = 25 会直接让构建失败
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
