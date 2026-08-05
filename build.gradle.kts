@@ -20,17 +20,19 @@ java {
     withSourcesJar()
 }
 
-loom {
-    splitEnvironmentSourceSets()
+val mainSourceSet = sourceSets.main.get()
+val clientSourceSet = sourceSets.create("client") {
+    compileClasspath += mainSourceSet.output + mainSourceSet.compileClasspath
+    runtimeClasspath += mainSourceSet.output + mainSourceSet.runtimeClasspath
+}
 
+loom {
     mods {
         register("changelog363") {
-            sourceSet(sourceSets.main.get())
-            sourceSet(sourceSets.getByName("client"))
+            sourceSet(mainSourceSet)
+            sourceSet(clientSourceSet)
         }
     }
-}
-fabricApi {
 }
 
 repositories {
@@ -53,7 +55,6 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:${project.property("loader_version")}")
     modImplementation("net.fabricmc:fabric-language-kotlin:${project.property("kotlin_loader_version")}")
     modImplementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
-    implementation("com.google.code.gson:gson:2.14.0")
 
     val clothConfig = "me.shedaniel.cloth:cloth-config-fabric:${project.property("cloth_config_version")}"
     modImplementation(clothConfig) {
@@ -65,18 +66,17 @@ dependencies {
 }
 
 tasks.processResources {
-    inputs.property("version", project.version)
-    inputs.property("minecraft_version", project.property("minecraft_version"))
-    inputs.property("loader_version", project.property("loader_version"))
+    val properties = mapOf(
+        "version" to project.version,
+        "minecraft_version" to project.property("minecraft_version"),
+        "loader_version" to project.property("loader_version"),
+        "kotlin_loader_version" to project.property("kotlin_loader_version"),
+    )
+    inputs.properties(properties)
     filteringCharset = "UTF-8"
 
     filesMatching("fabric.mod.json") {
-        expand(
-            "version" to project.version,
-            "minecraft_version" to project.property("minecraft_version")!!,
-            "loader_version" to project.property("loader_version")!!,
-            "kotlin_loader_version" to project.property("kotlin_loader_version")!!
-        )
+        expand(properties)
     }
 }
 
@@ -90,7 +90,7 @@ tasks.withType<KotlinCompile>().configureEach {
 }
 
 tasks.jar {
-    from("LICENSE") {
+    from("LICENSE.txt") {
         rename { "${it}_${project.base.archivesName.get()}" }
     }
 }

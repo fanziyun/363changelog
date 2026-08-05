@@ -7,13 +7,14 @@
 
 | 加载器 | 必需前置 |
 |--------|----------|
-| **Fabric** | [Fabric API](https://modrinth.com/mod/fabric-api) · [Fabric Language Kotlin](https://modrinth.com/mod/fabric-language-kotlin) · [Cloth Config](https://modrinth.com/mod/cloth-config) · [Mod Menu](https://modrinth.com/mod/modmenu) |
+| **Fabric** | [Fabric API](https://modrinth.com/mod/fabric-api) · [Fabric Language Kotlin](https://modrinth.com/mod/fabric-language-kotlin) · [Cloth Config](https://modrinth.com/mod/cloth-config) · [Mod Menu](https://modrinth.com/mod/modmenu)（可选，用于打开配置界面） |
 
 模组是纯客户端的，装在服务端没有意义。
 
 ## 配置说明
 
-配置文件由 Cloth Config 管理，从游戏内 ModMenu → 363Changelog 进入。
+配置文件由 Cloth Config 管理，装了 Mod Menu 时从游戏内 ModMenu → 363Changelog 进入；
+未装 Mod Menu 时可直接编辑 `.minecraft/config/changelog363.json`。
 
 | 字段 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -145,7 +146,7 @@ access_token 只保存在 `sessionStorage`，关闭标签页即失效。
 
 ### 项目结构
 
-用 Fabric Loom 的**分环境源码集**（split environment source sets）：
+项目使用**手动定义的客户端源码集**（不使用 `splitEnvironmentSourceSets`，Loom 直接打包 main 与 client 两个源码集）：
 
 ```
 src/main/     与端无关的代码：数据层、工具、内置 changelog.json、语言文件
@@ -155,9 +156,8 @@ src/client/   仅客户端的代码：两个界面、两个 mixin、配置类、
 Minecraft 1.20.1 用官方（Mojang）映射编译，Loom 负责运行时的名字映射，
 无需手动重混淆产物。
 
-Mixin 分两份：`src/main/resources/changelog363.mixins.json` 与
-仅客户端的 `src/client/resources/changelog363.client.mixins.json`，
-两者都在 `fabric.mod.json` 里声明。
+两个客户端 mixin 统一注册在 `src/client/resources/changelog363.client.mixins.json`，
+由 `fabric.mod.json` 声明；数据层不包含任何 mixin。
 
 ### 常用命令
 

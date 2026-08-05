@@ -3,9 +3,13 @@
 
 # Gradle cache folder
 .gradle
+gradle/gradle-daemon-jvm.properties
 
 # Gradle build folder
 build
+
+# Machine-local configuration
+local.properties
 
 # IntelliJ
 out/
@@ -16,6 +20,7 @@ out/
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+*.class
 
 # Common working directory
 run

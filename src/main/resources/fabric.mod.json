@@ -11,19 +11,15 @@
   "license": "MIT",
   "icon": "assets/changelog363/icon.png",
   "environment": "client",
-"entrypoints": {
+  "entrypoints": {
     "client": [
       "com.github.fanziyun.client.ChangelogClient"
-    ],
-    "main": [
-      "com.github.fanziyun.Changelog"
     ],
     "modmenu": [
       "com.github.fanziyun.client.ModMenuIntegration"
     ]
   },
   "mixins": [
-    "changelog363.mixins.json",
     {
       "config": "changelog363.client.mixins.json",
       "environment": "client"
@@ -34,7 +30,9 @@
     "fabric-language-kotlin": ">=${kotlin_loader_version}",
     "fabric-api": "*",
     "minecraft": "${minecraft_version}",
-    "cloth-config": "*",
+    "cloth-config": "*"
+  },
+  "suggests": {
     "modmenu": "*"
   }
 }

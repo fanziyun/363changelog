@@ -54,6 +54,6 @@ A Minecraft Fabric mod (Kotlin) that shows a modpack changelog on the title and 
 
 ## Agent-Specific Instructions
 
-- **Source sets**: Common logic goes in `src/main/`; client-only rendering, mixins, and config go in `src/client/` (the project defines the client source set manually (for Loom 1.5.x compatibility)).
+- **Source sets**: Common logic goes in `src/main/`; client-only rendering, mixins, and config go in `src/client/` (the project defines the client source set manually instead of using `splitEnvironmentSourceSets`).
 - **Mixins**: Register common mixins in `changelog363.mixins.json` and client-only ones in `changelog363.client.mixins.json`.
 - **New dependencies**: Update `fabric.mod.json` and run `./gradlew build` before committing.
