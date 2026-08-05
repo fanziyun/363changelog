@@ -5,6 +5,7 @@ import com.github.fanziyun.data.ChangelogEntry
 import com.github.fanziyun.data.ChangelogLoader
 import com.github.fanziyun.data.VersionChecker
 import com.github.fanziyun.util.ColorUtil
+import com.github.fanziyun.util.SemVer
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.client.gui.components.Button
 import net.minecraft.client.gui.components.Tooltip
@@ -73,6 +74,14 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
     override fun init() {
         super.init()
         rebuildRows()
+        // 标题/暂停界面触发的首次加载可能尚未结束；完成后回到客户端线程刷新当前界面。
+        // 否则用户过早打开本页时会一直看到空列表，只能手动点刷新。
+        ChangelogService.ensureChangelogLoaded().whenComplete { _, _ ->
+            val client = minecraft ?: return@whenComplete
+            client.execute {
+                if (client.screen === this@ChangelogOverviewScreen) rebuildRows()
+            }
+        }
 
         val totalButtonWidth = 214
         val buttonLeft = width / 2 - totalButtonWidth / 2
@@ -126,38 +135,41 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
         val contentRight = listRight - ROW_PADDING
         val textWidth = contentRight - TEXT_LEFT
 
-        rows = ChangelogLoader.data.entries.map { entry ->
-            val type = entry.types.first()
+        // 按版本号降序（最新在上），与 latestVersion 的取法一致，不依赖 JSON 书写顺序
+        rows = ChangelogLoader.data.entries
+            .sortedWith(compareByDescending(SemVer.COMPARATOR) { it.version })
+            .map { entry ->
+                val type = entry.types.first()
 
-            val date = entry.date
-            val dateWidth = if (date.isBlank()) 0 else font.width(date)
-            val dateX = contentRight - dateWidth
-            // 第一行（版本号 + 类型标签）共用的右边界：不能越过右对齐的日期
-            val lineLimit = if (dateWidth == 0) contentRight else dateX - GAP_BEFORE_DATE
+                val date = entry.date
+                val dateWidth = if (date.isBlank()) 0 else font.width(date)
+                val dateX = contentRight - dateWidth
+                // 第一行（版本号 + 类型标签）共用的右边界：不能越过右对齐的日期
+                val lineLimit = if (dateWidth == 0) contentRight else dateX - GAP_BEFORE_DATE
 
-            // 版本号自身也要截断，否则超长版本号会直接画到日期上，
-            // 而且会把 badgeX 顶过 lineLimit 导致类型标签全部消失
-            val versionText = font.ellipsize(
-                "${ColorUtil.typeIcon(type)} ${entry.version}",
-                lineLimit - TEXT_LEFT,
-            )
-            val badgeX = TEXT_LEFT + font.width(versionText) + GAP_AFTER_VERSION
+                // 版本号自身也要截断，否则超长版本号会直接画到日期上，
+                // 而且会把 badgeX 顶过 lineLimit 导致类型标签全部消失
+                val versionText = font.ellipsize(
+                    "${ColorUtil.typeIcon(type)} ${entry.version}",
+                    lineLimit - TEXT_LEFT,
+                )
+                val badgeX = TEXT_LEFT + font.width(versionText) + GAP_AFTER_VERSION
 
-            Row(
-                entry = entry,
-                versionText = versionText,
-                versionColor = ColorUtil.typeColor(type),
-                // 标签只排到日期左侧为止，放不下的整枚不画
-                badges = font.fitBadges(entry.types.map(::typeBadge), badgeX, lineLimit),
-                badgeX = badgeX,
-                date = date,
-                dateX = dateX,
-                title = font.ellipsize(entry.title, textWidth),
-                summary = entry.changes.firstOrNull()
-                    ?.let { font.ellipsize("• $it", textWidth) }
-                    .orEmpty(),
-            )
-        }
+                Row(
+                    entry = entry,
+                    versionText = versionText,
+                    versionColor = ColorUtil.typeColor(type),
+                    // 标签只排到日期左侧为止，放不下的整枚不画
+                    badges = font.fitBadges(entry.types.map(::typeBadge), badgeX, lineLimit),
+                    badgeX = badgeX,
+                    date = date,
+                    dateX = dateX,
+                    title = font.ellipsize(entry.title, textWidth),
+                    summary = entry.changes.firstOrNull()
+                        ?.let { font.ellipsize("• $it", textWidth) }
+                        .orEmpty(),
+                )
+            }
         clampScroll()
     }
 
