@@ -53,6 +53,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGithubStore } from '../stores/github'
 import { getCurrentUser } from '../api/github'
+import { consumeOauthState } from '../utils/oauth'
 
 type CallbackState = 'init' | 'loading' | 'success' | 'error'
 
@@ -66,8 +67,9 @@ const errorMessage = ref('')
 async function exchangeCode() {
   const code = route.query.code as string | undefined
   if (!code) {
-    state.value = 'error'
-    errorMessage.value = '未收到授权码'
+    // 保持 init 状态，交给模板里"未收到授权码"那一屏处理；
+    // 走 error 分支只会给出一个必然再次失败的"重新尝试"按钮
+    state.value = 'init'
     return
   }
 
@@ -109,6 +111,21 @@ function goBack() {
 }
 
 onMounted(() => {
+  if (!route.query.code) {
+    // 保持 init 状态，交给模板里"未收到授权码"那一屏
+    state.value = 'init'
+    return
+  }
+
+  // state 只核对一次（这里），核对通过后"重新尝试"按钮才只重跑换 token 那一步
+  const expected = consumeOauthState()
+  const returned = route.query.state as string | undefined
+  if (!expected || returned !== expected) {
+    state.value = 'error'
+    errorMessage.value = '登录状态校验失败（state 不匹配），请回到登录页重新发起授权'
+    return
+  }
+
   exchangeCode()
 })
 </script>

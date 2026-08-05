@@ -7,20 +7,20 @@
       </v-app-bar-title>
 
       <template #append>
-        <v-btn variant="text" @click="handleImport" :disabled="!showActions">
+        <v-btn variant="text" @click="handleImport">
           <v-icon icon="mdi-import" start />
           导入
         </v-btn>
-        <v-btn variant="text" @click="handleExport" :disabled="!showActions">
+        <v-btn variant="text" @click="handleExport">
           <v-icon icon="mdi-export" start />
           导出
         </v-btn>
-        <v-btn variant="text" @click="showSettingsDialog = true" :disabled="!showActions">
+        <v-btn variant="text" @click="showSettingsDialog = true">
           <v-icon icon="mdi-cog" start />
           设置
         </v-btn>
 
-        <GitHubPanel @login="handleGithubLogin" @logout="handleLogout" @upload="handleUpload" />
+        <GitHubPanel @login="handleGithubLogin" @logout="handleLogout" />
       </template>
     </v-app-bar>
 
@@ -84,7 +84,6 @@ const githubStore = useGithubStore()
 const activeTab = ref('entries')
 const toastVisible = ref(false)
 const toastMessage = ref('')
-const showActions = ref(true)
 const showSettingsDialog = ref(false)
 
 function showToast(msg: string) {
@@ -102,10 +101,7 @@ function handleImport() {
     const reader = new FileReader()
     reader.onload = () => {
       try {
-        const text = reader.result as string
-        const data = fromImportJson(text)
-        if (!data) throw new Error('解析返回数据为空')
-        editorStore.importData(data)
+        editorStore.importData(fromImportJson(reader.result as string))
         showToast('导入成功')
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : '未知错误'
@@ -122,8 +118,7 @@ function handleImport() {
 
 function handleExport() {
   try {
-    const json = toExportJson(editorStore.allData)
-    const blob = new Blob([json], { type: 'application/json' })
+    const blob = new Blob([toExportJson(editorStore.allData)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -144,10 +139,6 @@ function handleGithubLogin() {
 function handleLogout() {
   githubStore.clearAuth()
   showToast('已退出 GitHub 登录')
-}
-
-function handleUpload() {
-  showToast('上传功能待实现')
 }
 </script>
 

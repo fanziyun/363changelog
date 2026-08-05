@@ -54,7 +54,7 @@
               请选择处理方式：
             </div>
             <div class="d-flex flex-wrap justify-center ga-2">
-              <v-btn variant="outlined" color="warning" prepend-icon="mdi-upload" @click="handleForceOverwrite">
+              <v-btn variant="outlined" color="warning" prepend-icon="mdi-upload" @click="performUpload(false)">
                 覆盖
               </v-btn>
               <v-btn variant="text" @click="closeDialog">
@@ -95,7 +95,7 @@
         <v-btn variant="text" @click="closeDialog">
           取消
         </v-btn>
-        <v-btn variant="elevated" color="primary" prepend-icon="mdi-upload" @click="handleUpload">
+        <v-btn variant="elevated" color="primary" prepend-icon="mdi-upload" @click="performUpload(true)">
           确认上传
         </v-btn>
       </v-card-actions>
@@ -104,11 +104,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useEditorStore } from '../stores/editor'
 import { useGithubStore } from '../stores/github'
-import { getFile, uploadFile } from '../api/github'
+import { GithubError, getFile, uploadFile } from '../api/github'
+import { CHANGELOG_PATH } from '../models/constants'
 import { toExportJson } from '../utils/json'
+
+const SUCCESS_CLOSE_DELAY_MS = 1500
 
 const props = defineProps<{
   modelValue: boolean
@@ -131,14 +134,8 @@ const commitSha = ref('')
 // Computed preview JSON
 const previewJson = computed(() => toExportJson(editorStore.allData))
 
-// Compute latest version for default commit message
-const latestVersion = computed(() => {
-  const entries = editorStore.entries
-  if (entries.length > 0) {
-    return entries[0].version || ''
-  }
-  return ''
-})
+// 条目按时间顺序追加，最新的一条在数组末尾
+const latestVersion = computed(() => editorStore.entries.at(-1)?.version ?? '')
 
 // Derived title text and icon from state
 const titleIcon = computed(() => {
@@ -160,81 +157,82 @@ const titleText = computed(() => {
   }
 })
 
+// 成功后自动关闭的定时器。不记下来的话，用户在这 1.5 秒内点开外面重新打开对话框，
+// 旧定时器会把新开的对话框关掉，还会补发一次上一次上传的 upload-success
+let closeTimer: ReturnType<typeof setTimeout> | undefined
+
+function cancelAutoClose() {
+  if (closeTimer !== undefined) {
+    clearTimeout(closeTimer)
+    closeTimer = undefined
+  }
+}
+
 // Reset state when dialog opens
 watch(() => props.modelValue, (open) => {
-  if (open) {
-    uploadState.value = 'confirm'
-    errorMessage.value = ''
-    commitSha.value = ''
-    commitMessage.value = `更新日志配置: v${latestVersion.value}`
-  } else {
-    // Allow reset for next open
-  }
+  cancelAutoClose()
+  if (!open) return
+  uploadState.value = 'confirm'
+  errorMessage.value = ''
+  commitSha.value = ''
+  commitMessage.value = `更新日志配置: v${latestVersion.value}`
 })
+
+onUnmounted(cancelAutoClose)
 
 function closeDialog() {
   emit('update:modelValue', false)
 }
 
-async function handleUpload() {
-  if (!githubStore.token || !githubStore.selectedFork) {
+/** 取远程文件当前的 sha；文件还不存在时按新建处理 */
+async function currentSha(token: string, owner: string, repo: string): Promise<string | undefined> {
+  try {
+    return (await getFile(token, owner, repo, CHANGELOG_PATH)).sha
+  } catch (err: unknown) {
+    if (err instanceof GithubError && err.status === 404) return undefined
+    throw err
+  }
+}
+
+/**
+ * 上传当前编辑内容。
+ *
+ * 两次调用都必须带上远程最新的 sha —— GitHub 的 contents API 把「没有 sha」理解成
+ * 「新建文件」，对已存在的文件会直接回 422，所以不带 sha 的"覆盖"其实永远覆盖不掉。
+ * 覆盖的语义是重新取一次当前 sha 再写，把别人的改动顶掉。
+ *
+ * @param firstAttempt 首次尝试。失败且是冲突时展示冲突界面；"覆盖"重试则直接报错。
+ */
+async function performUpload(firstAttempt: boolean) {
+  const token = githubStore.token
+  const fork = githubStore.selectedFork
+  if (!token || !fork) {
     errorMessage.value = '请先登录 GitHub 并选择 Fork'
     uploadState.value = 'error'
     return
   }
 
   uploadState.value = 'uploading'
+  const [owner, repo] = fork.split('/')
   try {
-    const [owner, repo] = githubStore.selectedFork.split('/')
-    const content = previewJson.value
-
-    // First get current file to get latest SHA (optimistic lock)
-    const fileInfo = await getFile(githubStore.token, owner, repo, 'changelog.json')
-    const sha = fileInfo.sha
-
-    // Then upload with SHA (fails if remote has changed)
-    const result = await uploadFile(githubStore.token, owner, repo, 'changelog.json', content, sha, commitMessage.value)
+    const sha = await currentSha(token, owner, repo)
+    const result = await uploadFile(
+      token, owner, repo, CHANGELOG_PATH, previewJson.value, sha, commitMessage.value,
+    )
     commitSha.value = result
     uploadState.value = 'success'
 
-    // Auto-close after success
-    setTimeout(() => {
+    cancelAutoClose()
+    closeTimer = setTimeout(() => {
+      closeTimer = undefined
       emit('upload-success', result)
       closeDialog()
-    }, 1500)
+    }, SUCCESS_CLOSE_DELAY_MS)
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : '未知错误'
-    if (msg.includes('SHA') || msg.includes('已被修改') || msg.includes('409') || msg.includes('422')) {
-      uploadState.value = 'conflict'
-      errorMessage.value = msg
-    } else {
-      uploadState.value = 'error'
-      errorMessage.value = msg
-    }
-  }
-}
-
-async function handleForceOverwrite() {
-  if (!githubStore.token || !githubStore.selectedFork) return
-
-  uploadState.value = 'uploading'
-  try {
-    const [owner, repo] = githubStore.selectedFork.split('/')
-    const content = previewJson.value
-
-    // Upload WITHOUT sha to force overwrite
-    const result = await uploadFile(githubStore.token, owner, repo, 'changelog.json', content, undefined, commitMessage.value)
-    commitSha.value = result
-    uploadState.value = 'success'
-
-    setTimeout(() => {
-      emit('upload-success', result)
-      closeDialog()
-    }, 1500)
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : '未知错误'
-    uploadState.value = 'error'
-    errorMessage.value = msg
+    errorMessage.value = err instanceof Error ? err.message : '未知错误'
+    // 按状态码判断冲突，不要去匹配错误文案
+    uploadState.value =
+      firstAttempt && err instanceof GithubError && err.isConflict ? 'conflict' : 'error'
   }
 }
 

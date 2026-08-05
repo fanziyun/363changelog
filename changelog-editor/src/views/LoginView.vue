@@ -8,6 +8,11 @@
         通过 GitHub 登录以管理您的更新日志文件
       </p>
 
+      <v-alert v-if="!clientId" type="warning" variant="tonal" density="compact" class="mb-4 text-left">
+        未配置 <code>VITE_GITHUB_CLIENT_ID</code>，请参考 <code>.env.example</code> 填入
+        GitHub OAuth App 的 Client ID 后重新启动。
+      </v-alert>
+
       <v-btn
         size="x-large"
         color="dark"
@@ -15,6 +20,7 @@
         block
         class="text-none"
         prepend-icon="mdi-github"
+        :disabled="!clientId"
         @click="login"
       >
         使用 GitHub 登录
@@ -24,14 +30,19 @@
 </template>
 
 <script setup lang="ts">
-const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID
-const redirectUri = `${window.location.origin}/callback`
+import { createOauthState } from '../utils/oauth'
+
+// 没配 Client ID 时直接跳转会落到 GitHub 的报错页，不如在这里提前拦住
+const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID as string | undefined
 
 function login() {
+  if (!clientId) return
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: redirectUri,
+    redirect_uri: `${window.location.origin}/callback`,
     scope: 'repo',
+    // 回调页会核对这个值，防止别人伪造一次授权把你登录到他的账号上
+    state: createOauthState(),
   })
   window.location.href = `https://github.com/login/oauth/authorize?${params.toString()}`
 }
