@@ -7,14 +7,19 @@ import me.shedaniel.autoconfig.AutoConfig
 import me.shedaniel.autoconfig.serializer.GsonConfigSerializer
 import net.minecraft.client.gui.screens.Screen
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.atomic.AtomicBoolean
 
 object ChangelogService {
+
+    private val initialized = AtomicBoolean()
 
     @Volatile
     var config: ModConfig? = null
         private set
 
     fun init() {
+        if (!initialized.compareAndSet(false, true)) return
+
         AutoConfig.register(ModConfig::class.java) { definition, clazz ->
             GsonConfigSerializer(definition, clazz)
         }
@@ -37,8 +42,16 @@ object ChangelogService {
             ChangelogLoader.ensureLoaded(cfg.changelogUrl)
         }
 
-        return loading.whenComplete { _, _ ->
-            if (cfg.enableVersionCheck) VersionChecker.check(cfg.modpackVersion)
+        return loading.whenComplete { success, exception ->
+            val currentConfig = config
+            if (
+                exception == null && success == true && !ChangelogLoader.isError &&
+                currentConfig?.enableVersionCheck == true
+            ) {
+                VersionChecker.check(currentConfig.modpackVersion)
+            } else {
+                VersionChecker.reset()
+            }
         }
     }
 }

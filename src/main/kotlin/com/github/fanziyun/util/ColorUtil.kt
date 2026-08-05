@@ -14,7 +14,7 @@ object ColorUtil {
         val hex = when {
             text.startsWith("0x", ignoreCase = true) -> text.substring(2)
             text.startsWith("#") -> text.substring(1)
-            else -> return text.toIntOrNull()?.let(::opaque) ?: defaultColor
+            else -> return parseDecimal(text, defaultColor)
         }
 
         return try {
@@ -32,5 +32,12 @@ object ColorUtil {
 
     fun typeIcon(type: String): String = ChangelogType.of(type)?.icon ?: ChangelogType.UNKNOWN_ICON
 
-    private fun opaque(value: Int): Int = if (value in 0x000000..0xFFFFFF) BLACK or value else value
+    private fun parseDecimal(text: String, defaultColor: Int): Int {
+        val value = text.toLongOrNull() ?: return defaultColor
+        return when (value) {
+            in 0x000000..0xFFFFFF -> BLACK or value.toInt()
+            in Int.MIN_VALUE.toLong()..0xFFFFFFFFL -> value.toInt()
+            else -> defaultColor
+        }
+    }
 }

@@ -38,7 +38,13 @@ fun Font.fitBadges(badges: List<Badge>, startX: Int, limitX: Int): List<Badge> {
     var x = startX
     for (badge in badges) {
         val badgeWidth = badgeWidth(badge)
-        if (x + badgeWidth > limitX) break
+        if (x + badgeWidth > limitX) {
+            if (fitted.isEmpty()) {
+                val text = ellipsize(badge.text, limitX - x - BADGE_PADDING * 2)
+                if (text.isNotEmpty()) fitted += badge.copy(text = text)
+            }
+            break
+        }
         fitted += badge
         x += badgeWidth + BADGE_GAP
     }
@@ -56,8 +62,10 @@ fun Font.ellipsize(text: String, maxWidth: Int): String {
     if (maxWidth <= 0) return ""
     if (width(text) <= maxWidth) return text
 
-    val budget = maxWidth - width(ELLIPSIS)
-    if (budget <= 0) return ""
+    val ellipsisWidth = width(ELLIPSIS)
+    if (ellipsisWidth > maxWidth) return ""
+    val budget = maxWidth - ellipsisWidth
+    if (budget == 0) return ELLIPSIS
 
     var end = 0
     while (end < text.length) {
@@ -65,40 +73,37 @@ fun Font.ellipsize(text: String, maxWidth: Int): String {
         if (width(text.substring(0, next)) > budget) break
         end = next
     }
-    return if (end == 0) "" else text.substring(0, end) + ELLIPSIS
+    return if (end == 0) ELLIPSIS else text.substring(0, end) + ELLIPSIS
 }
 
 fun Font.wrap(text: String, maxWidth: Int): List<String> {
-    if (text.isEmpty()) return listOf("")
-    if (maxWidth <= 0 || width(text) <= maxWidth) return listOf(text)
+    val normalized = text.trim()
+    if (normalized.isEmpty()) return listOf("")
+    if (maxWidth <= 0 || width(normalized) <= maxWidth) return listOf(normalized)
 
     val lines = mutableListOf<String>()
-    val line = StringBuilder()
-    var lastSpace = -1
-
-    var index = 0
-    while (index < text.length) {
-        val next = text.offsetByCodePoints(index, 1)
-        val chunk = text.substring(index, next)
-
-        if (line.isNotEmpty() && width(line.toString() + chunk) > maxWidth) {
-            if (lastSpace > 0) {
-                lines += line.substring(0, lastSpace)
-                val carry = line.substring(lastSpace + 1)
-                line.setLength(0)
-                line.append(carry)
-            } else {
-                lines += line.toString()
-                line.setLength(0)
-            }
-            lastSpace = -1
+    var remaining = normalized
+    while (remaining.isNotEmpty()) {
+        if (width(remaining) <= maxWidth) {
+            lines += remaining
+            break
         }
 
-        if (chunk.length == 1 && chunk[0].isWhitespace()) lastSpace = line.length
-        line.append(chunk)
-        index = next
-    }
+        var index = 0
+        var fittingEnd = 0
+        var lastBreak = -1
+        while (index < remaining.length) {
+            val next = remaining.offsetByCodePoints(index, 1)
+            if (width(remaining.substring(0, next)) > maxWidth) break
+            fittingEnd = next
+            if (remaining.substring(index, next).all(Char::isWhitespace)) lastBreak = next
+            index = next
+        }
 
-    if (line.isNotEmpty()) lines += line.toString()
+        if (fittingEnd == 0) fittingEnd = remaining.offsetByCodePoints(0, 1)
+        val breakAt = lastBreak.takeIf { it > 0 } ?: fittingEnd
+        lines += remaining.substring(0, breakAt).trimEnd()
+        remaining = remaining.substring(breakAt).trimStart()
+    }
     return lines
 }
