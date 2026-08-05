@@ -177,6 +177,7 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
         val stats = Component.translatable("screen.changelog363.stats", rows.size).string
         graphics.drawString(font, stats, LIST_LEFT, 35, ColorUtil.GREY)
         renderUpdateStatus(graphics, stats)
+        renderWarningBanner(graphics)
 
         if (rows.isEmpty()) renderEmptyState(graphics) else renderRows(graphics)
         renderScrollbar(graphics)
@@ -203,6 +204,18 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
         ).string
         val rendered = font.ellipsize(update, listRight - left)
         if (rendered.isNotEmpty()) graphics.drawString(font, rendered, left, 35, ColorUtil.YELLOW)
+    }
+
+    private fun renderWarningBanner(graphics: GuiGraphics) {
+        // 空列表 + 全部来源失败时由空态提示负责展示，避免重复
+        if (ChangelogLoader.isError && rows.isEmpty()) return
+
+        val message = if (ChangelogLoader.isError) ChangelogLoader.errorMessage else ChangelogLoader.remoteError
+        if (message.isBlank()) return
+
+        val label = Component.translatable("screen.changelog363.remote_error", message).string
+        val rendered = font.ellipsize(label, (listRight - LIST_LEFT).coerceAtLeast(0))
+        if (rendered.isNotEmpty()) graphics.drawString(font, rendered, LIST_LEFT, 45, ColorUtil.YELLOW)
     }
 
     private fun renderEmptyState(graphics: GuiGraphics) {

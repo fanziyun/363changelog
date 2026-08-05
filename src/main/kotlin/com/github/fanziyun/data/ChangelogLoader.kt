@@ -32,6 +32,7 @@ object ChangelogLoader {
         val isLoaded: Boolean = false,
         val isError: Boolean = false,
         val errorMessage: String = "",
+        val remoteError: String = "",
     )
 
     private data class LoadRequest(
@@ -84,6 +85,7 @@ object ChangelogLoader {
     val isLoaded: Boolean get() = stateRef.get().isLoaded
     val isError: Boolean get() = stateRef.get().isError
     val errorMessage: String get() = stateRef.get().errorMessage
+    val remoteError: String get() = stateRef.get().remoteError
     val data: ChangelogData get() = dataRef.get()
 
     val latestVersion: String
@@ -133,36 +135,44 @@ object ChangelogLoader {
     }
 
     private fun doLoad(request: LoadRequest): Boolean {
+        val previous = stateRef.get()
+        // 刷新全部失败时保留同 URL 上次成功的数据，避免网络抖动把可用列表清空
+        val keepDataOnFailure = previous.isLoaded && !previous.isError && lastCompletedUrl == request.remoteUrl
         stateRef.set(State())
+
+        var remoteError = ""
         val failures = mutableListOf<String>()
         val cacheFiles = request.remoteUrl.takeIf(String::isNotBlank)?.let(::cacheFilesFor)
 
         if (cacheFiles != null) {
             val remote = loadFromRemote(request, cacheFiles)
-            if (remote.isSuccess) return completeSuccess(request, remote.data!!)
-            remote.error.takeIf(String::isNotBlank)?.let(failures::add)
+            if (remote.isSuccess) return completeSuccess(request, remote.data!!, remoteError = "")
+            remote.error.takeIf(String::isNotBlank)?.let {
+                failures.add(it)
+                remoteError = it
+            }
 
             val cached = loadFromCache(cacheFiles)
-            if (cached.isSuccess) return completeSuccess(request, cached.data!!)
+            if (cached.isSuccess) return completeSuccess(request, cached.data!!, remoteError)
             cached.error.takeIf(String::isNotBlank)?.let(failures::add)
         }
 
         val bundled = loadFromResources()
-        if (bundled.isSuccess) return completeSuccess(request, bundled.data!!)
+        if (bundled.isSuccess) return completeSuccess(request, bundled.data!!, remoteError)
         bundled.error.takeIf(String::isNotBlank)?.let(failures::add)
 
         val message = failures.distinct().joinToString("; ")
             .ifBlank { "No changelog source available" }
-        dataRef.set(ChangelogData.EMPTY)
-        stateRef.set(State(isLoaded = true, isError = true, errorMessage = message))
+        if (!keepDataOnFailure) dataRef.set(ChangelogData.EMPTY)
+        stateRef.set(State(isLoaded = true, isError = true, errorMessage = message, remoteError = remoteError))
         synchronized(lock) { lastCompletedUrl = request.remoteUrl }
         Changelog.LOGGER.error("Failed to load changelog from any source: {}", message)
         return false
     }
 
-    private fun completeSuccess(request: LoadRequest, loadedData: ChangelogData): Boolean {
+    private fun completeSuccess(request: LoadRequest, loadedData: ChangelogData, remoteError: String): Boolean {
         dataRef.set(loadedData)
-        stateRef.set(State(isLoaded = true))
+        stateRef.set(State(isLoaded = true, remoteError = remoteError))
         synchronized(lock) { lastCompletedUrl = request.remoteUrl }
         return true
     }

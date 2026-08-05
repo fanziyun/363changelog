@@ -9,6 +9,7 @@
   "screen.changelog363.load_failed": "Failed to load: %s",
   "screen.changelog363.no_entries": "No changelog entries",
   "screen.changelog363.no_changes": "No changes listed for this version",
+  "screen.changelog363.remote_error": "Remote fetch failed: %s, showing cached/bundled data",
   "screen.changelog363.refresh": "Refresh",
   "screen.changelog363.refresh.tooltip": "Re-fetch the remote changelog",
   "changelog363.type.major": "Major Update",
