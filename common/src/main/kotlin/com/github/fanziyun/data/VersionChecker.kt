@@ -2,48 +2,41 @@ package com.github.fanziyun.data
 
 import com.github.fanziyun.Changelog
 import com.github.fanziyun.util.SemVer
+import java.util.concurrent.atomic.AtomicReference
 
 object VersionChecker {
 
-    @Volatile
-    var isDone: Boolean = false
-        private set
+    private data class State(
+        val isDone: Boolean = false,
+        val hasUpdate: Boolean = false,
+        val latestVersion: String = "",
+        val currentVersion: String = "",
+    )
 
-    @Volatile
-    var hasUpdate: Boolean = false
-        private set
+    private val state = AtomicReference(State())
 
-    @Volatile
-    var latestVersion: String = ""
-        private set
+    val isDone: Boolean get() = state.get().isDone
+    val hasUpdate: Boolean get() = state.get().hasUpdate
+    val latestVersion: String get() = state.get().latestVersion
+    val currentVersion: String get() = state.get().currentVersion
 
-    @Volatile
-    var currentVersion: String = ""
-        private set
-
-    @Synchronized
     fun check(modpackVersion: String) {
-        currentVersion = modpackVersion
-        if (modpackVersion.isBlank()) {
-            hasUpdate = false
-            isDone = true
+        val current = modpackVersion.trim()
+        if (current.isEmpty()) {
+            state.set(State(isDone = true))
             return
         }
 
         val latest = ChangelogLoader.latestVersion
-        latestVersion = latest
-        hasUpdate = latest.isNotBlank() && SemVer.compare(latest, modpackVersion) > 0
-        isDone = true
+        val hasUpdate = latest.isNotBlank() && SemVer.compare(latest, current) > 0
+        state.set(State(isDone = true, hasUpdate = hasUpdate, latestVersion = latest, currentVersion = current))
         Changelog.LOGGER.info(
             "Version check: current={}, latest={}, hasUpdate={}",
-            modpackVersion, latest, hasUpdate,
+            current, latest, hasUpdate,
         )
     }
 
-    @Synchronized
     fun reset() {
-        isDone = false
-        hasUpdate = false
-        latestVersion = ""
+        state.set(State())
     }
 }

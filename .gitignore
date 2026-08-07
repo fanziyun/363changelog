@@ -40,3 +40,9 @@ changelog-editor-web/
 .playwright-mcp/
 
 363changelog.7z
+
+gradle/gradle-daemon-jvm.properties
+
+local.properties
+
+*.class

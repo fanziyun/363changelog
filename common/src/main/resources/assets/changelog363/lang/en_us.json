@@ -6,7 +6,11 @@
   "screen.changelog363.stats": "%s versions",
   "screen.changelog363.update_available": "New version: %s",
   "screen.changelog363.up_to_date": "Up to date",
-  "screen.changelog363.more": "%s more lines",
+  "screen.changelog363.loading": "Loading changelog…",
+  "screen.changelog363.load_failed": "Failed to load: %s",
+  "screen.changelog363.no_entries": "No changelog entries",
+  "screen.changelog363.no_changes": "No changes listed for this version",
+  "screen.changelog363.remote_error": "Remote fetch failed: %s, showing cached/bundled data",
   "screen.changelog363.refresh": "Refresh",
   "screen.changelog363.refresh.tooltip": "Re-fetch the remote changelog",
 
