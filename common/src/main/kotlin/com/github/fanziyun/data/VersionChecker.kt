@@ -2,55 +2,41 @@ package com.github.fanziyun.data
 
 import com.github.fanziyun.Changelog
 import com.github.fanziyun.util.SemVer
+import java.util.concurrent.atomic.AtomicReference
 
-/**
- * 版本检测。
- *
- * 直接复用 [ChangelogLoader] 已加载的数据做比较，不会额外发起 HTTP 请求，
- * 因此必须在加载完成之后调用（见 `ChangelogService.ensureChangelogLoaded`）。
- */
 object VersionChecker {
 
-    @Volatile
-    var isDone: Boolean = false
-        private set
+    private data class State(
+        val isDone: Boolean = false,
+        val hasUpdate: Boolean = false,
+        val latestVersion: String = "",
+        val currentVersion: String = "",
+    )
 
-    @Volatile
-    var hasUpdate: Boolean = false
-        private set
+    private val state = AtomicReference(State())
 
-    @Volatile
-    var latestVersion: String = ""
-        private set
+    val isDone: Boolean get() = state.get().isDone
+    val hasUpdate: Boolean get() = state.get().hasUpdate
+    val latestVersion: String get() = state.get().latestVersion
+    val currentVersion: String get() = state.get().currentVersion
 
-    @Volatile
-    var currentVersion: String = ""
-        private set
-
-    /** 比较整合包版本与更新日志中的最高版本。 */
-    @Synchronized
     fun check(modpackVersion: String) {
-        currentVersion = modpackVersion
-        if (modpackVersion.isBlank()) {
-            hasUpdate = false
-            isDone = true
+        val current = modpackVersion.trim()
+        if (current.isEmpty()) {
+            state.set(State(isDone = true))
             return
         }
+
         val latest = ChangelogLoader.latestVersion
-        latestVersion = latest
-        hasUpdate = latest.isNotBlank() && SemVer.compare(latest, modpackVersion) > 0
-        isDone = true
+        val hasUpdate = latest.isNotBlank() && SemVer.compare(latest, current) > 0
+        state.set(State(isDone = true, hasUpdate = hasUpdate, latestVersion = latest, currentVersion = current))
         Changelog.LOGGER.info(
             "Version check: current={}, latest={}, hasUpdate={}",
-            modpackVersion, latest, hasUpdate
+            current, latest, hasUpdate,
         )
     }
 
-    /** 重新拉取数据前调用，让界面回到"检测中"状态。 */
-    @Synchronized
     fun reset() {
-        isDone = false
-        hasUpdate = false
-        latestVersion = ""
+        state.set(State())
     }
 }

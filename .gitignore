@@ -3,9 +3,12 @@
 
 # Gradle cache folder
 .gradle
+gradle/gradle-daemon-jvm.properties
 
 # Gradle build folder
 build
+
+local.properties
 
 # IntelliJ
 out/
@@ -37,3 +40,4 @@ changelog-editor-web/
 .playwright-mcp/
 
 363changelog.7z
+*.class
