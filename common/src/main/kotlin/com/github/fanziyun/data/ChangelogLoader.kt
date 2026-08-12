@@ -17,7 +17,11 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.HexFormat
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 object ChangelogLoader {
@@ -27,6 +31,10 @@ object ChangelogLoader {
     private const val MAX_CHANGELOG_BYTES = 4 * 1024 * 1024
     private const val USER_AGENT = "363Changelog"
     private const val BUNDLED_RESOURCE = "/changelog.json"
+    // 端到端超时。connectTimeout 只管 TCP 连接、管不到 DNS；readTimeout 是每次读而非整体，
+    // 所以网络挂死时只有这个全局 deadline 才能保证加载一定在期限内结束、UI 不会永远停在"加载中"。
+    // 这是 load()/ensureLoaded() 公共 API 的兜底默认；用户可配置的值来自 ModConfig.loadTimeoutSeconds。
+    private const val DEFAULT_LOAD_TIMEOUT_MS = 30_000L
 
     private data class State(
         val isLoaded: Boolean = false,
@@ -38,6 +46,10 @@ object ChangelogLoader {
     private data class LoadRequest(
         val remoteUrl: String,
         val forceRefresh: Boolean,
+        val timeoutMs: Long,
+        val deadlineNanos: Long,
+        /** 在 load() 加锁瞬间捕获：该 URL 之前是否已有一次成功加载，超时时据此保留上次好数据 */
+        val keepDataOnTimeout: Boolean,
     )
 
     private data class ActiveLoad(
@@ -78,6 +90,8 @@ object ChangelogLoader {
 
     private val stateRef = AtomicReference(State())
     private val dataRef = AtomicReference(ChangelogData.EMPTY)
+    // 每次发布终态（成功/失败/超时）递增；界面据此在仍打开时重建，避免迟到结果被错过
+    private val generation = AtomicLong()
     private val lock = Any()
     private var activeLoad: ActiveLoad? = null
     private var lastCompletedUrl: String? = null
@@ -87,6 +101,7 @@ object ChangelogLoader {
     val errorMessage: String get() = stateRef.get().errorMessage
     val remoteError: String get() = stateRef.get().remoteError
     val data: ChangelogData get() = dataRef.get()
+    val dataVersion: Long get() = generation.get()
 
     val latestVersion: String
         get() = data.entries
@@ -96,9 +111,24 @@ object ChangelogLoader {
             .maxWithOrNull(SemVer.COMPARATOR)
             .orEmpty()
 
-    fun load(remoteUrl: String, forceRefresh: Boolean = false): CompletableFuture<Boolean> {
-        val request = LoadRequest(remoteUrl.trim(), forceRefresh)
+    fun load(
+        remoteUrl: String,
+        forceRefresh: Boolean = false,
+        timeoutMs: Long = DEFAULT_LOAD_TIMEOUT_MS,
+    ): CompletableFuture<Boolean> {
+        val normalizedUrl = remoteUrl.trim()
+        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
         synchronized(lock) {
+            // 在 doLoad 重置 stateRef 之前、加锁瞬间捕获"该 URL 是否仍有可展示的数据"，
+            // 供超时发布时决定保留上次好数据；也避免在 Delayer 线程上无锁读 lastCompletedUrl。
+            // 判断依据是"该 URL 是否仍有已保留的数据"，而不是瞬时错误标志——一次保留数据的超时
+            // 会把 state 标成 error 但保留 dataRef，随后的第二次超时也必须仍能识别这份数据。
+            val lastState = stateRef.get()
+            val keepDataOnTimeout =
+                lastCompletedUrl == normalizedUrl &&
+                    ((lastState.isLoaded && !lastState.isError) || dataRef.get() != ChangelogData.EMPTY)
+            val request = LoadRequest(normalizedUrl, forceRefresh, timeoutMs, deadlineNanos, keepDataOnTimeout)
+
             val running = activeLoad?.takeIf { !it.future.isDone }
             if (running != null) {
                 val sameUrl = running.request.remoteUrl == request.remoteUrl
@@ -106,21 +136,44 @@ object ChangelogLoader {
                 if (sameUrl && satisfiesRefresh) return running.future
 
                 return running.future.handle { _, _ -> Unit }
-                    .thenCompose { load(request.remoteUrl, request.forceRefresh) }
+                    .thenCompose { load(request.remoteUrl, request.forceRefresh, request.timeoutMs) }
             }
 
             val future = CompletableFuture.supplyAsync({ doLoad(request) }, executor)
-            activeLoad = ActiveLoad(request, future)
-            future.whenComplete { _, _ ->
+            // orTimeout 是安全网：即使 doLoad 因为 DNS 卡死/慢速滴流而无限期不返回，
+            // 返回给调用方的 future 也保证在 timeoutMs 内完成，UI 因此总能离开"加载中"。
+            val bounded = future
+                .orTimeout(request.timeoutMs, TimeUnit.MILLISECONDS)
+                .exceptionally { exception ->
+                    when (exception) {
+                        is TimeoutException -> {
+                            // doLoad 其实已成功（completeSuccess 已发布 success）时，别把成功报成超时
+                            val current = stateRef.get()
+                            if (current.isLoaded && !current.isError) {
+                                true
+                            } else {
+                                publishTimeoutState(request)
+                                false
+                            }
+                        }
+                        // doLoad 抛异常（如 Platform 解析失败）不能留 state=loading：发布终态错误
+                        else -> {
+                            publishErrorState(request, exception)
+                            false
+                        }
+                    }
+                }
+            activeLoad = ActiveLoad(request, bounded)
+            bounded.whenComplete { _, _ ->
                 synchronized(lock) {
-                    if (activeLoad?.future === future) activeLoad = null
+                    if (activeLoad?.future === bounded) activeLoad = null
                 }
             }
-            return future
+            return bounded
         }
     }
 
-    fun ensureLoaded(remoteUrl: String): CompletableFuture<Boolean> {
+    fun ensureLoaded(remoteUrl: String, timeoutMs: Long = DEFAULT_LOAD_TIMEOUT_MS): CompletableFuture<Boolean> {
         val normalizedUrl = remoteUrl.trim()
         synchronized(lock) {
             val running = activeLoad?.takeIf { !it.future.isDone }
@@ -131,7 +184,7 @@ object ChangelogLoader {
                 return CompletableFuture.completedFuture(true)
             }
         }
-        return load(normalizedUrl)
+        return load(normalizedUrl, timeoutMs = timeoutMs)
     }
 
     private fun doLoad(request: LoadRequest): Boolean {
@@ -145,7 +198,13 @@ object ChangelogLoader {
         val cacheFiles = request.remoteUrl.takeIf(String::isNotBlank)?.let(::cacheFilesFor)
 
         if (cacheFiles != null) {
-            val remote = loadFromRemote(request, cacheFiles)
+            // 端到端超时：deadline 一到就跳过远端，直接走 cache -> bundled 兜底，绝不无限期等网络。
+            // 每个阶段本身仍受 connect/read 超时限制，这里的检查只是把"已超时"提前暴露。
+            val remote = if (deadlineExpired(request)) {
+                SourceResult.failure(timeoutMessage(request))
+            } else {
+                loadFromRemote(request, cacheFiles)
+            }
             if (remote.isSuccess) return completeSuccess(request, remote.data!!, remoteError = "")
             remote.error.takeIf(String::isNotBlank)?.let {
                 failures.add(it)
@@ -165,6 +224,7 @@ object ChangelogLoader {
             .ifBlank { "No changelog source available" }
         if (!keepDataOnFailure) dataRef.set(ChangelogData.EMPTY)
         stateRef.set(State(isLoaded = true, isError = true, errorMessage = message, remoteError = remoteError))
+        generation.incrementAndGet()
         synchronized(lock) { lastCompletedUrl = request.remoteUrl }
         Changelog.LOGGER.error("Failed to load changelog from any source: {}", message)
         return false
@@ -173,8 +233,52 @@ object ChangelogLoader {
     private fun completeSuccess(request: LoadRequest, loadedData: ChangelogData, remoteError: String): Boolean {
         dataRef.set(loadedData)
         stateRef.set(State(isLoaded = true, remoteError = remoteError))
+        generation.incrementAndGet()
         synchronized(lock) { lastCompletedUrl = request.remoteUrl }
         return true
+    }
+
+    private fun deadlineExpired(request: LoadRequest): Boolean =
+        System.nanoTime() >= request.deadlineNanos
+
+    private fun timeoutMessage(request: LoadRequest): String =
+        "Changelog load timed out after ${request.timeoutMs / 1000}s"
+
+    /**
+     * orTimeout 触发的兜底：在 JDK Delayer daemon 线程上发布一个终态，让 UI 离开"加载中"。
+     * 只做锁无关的原子状态写，不做任何 IO —— 卡住的 loader 线程此时可能仍在跑，等它返回后
+     * 它的原子写会覆盖这里发布的超时态；界面通过 dataVersion 生成号在仍打开时重建收敛。
+     */
+    private fun publishTimeoutState(request: LoadRequest) {
+        // 若 doLoad 其实已经成功（completeSuccess 已把 state 写成成功），说明 Delayer 在
+        // future 完成 CAS 上赢了正常完成——别再用超时错误覆盖这次真实成功。
+        val current = stateRef.get()
+        if (current.isLoaded && !current.isError) return
+
+        val message = timeoutMessage(request)
+        if (!request.keepDataOnTimeout) dataRef.set(ChangelogData.EMPTY)
+        stateRef.set(State(isLoaded = true, isError = true, errorMessage = message, remoteError = message))
+        generation.incrementAndGet()
+        Changelog.LOGGER.warn(
+            "Changelog load timed out after {}s; {}",
+            request.timeoutMs / 1000,
+            if (request.keepDataOnTimeout) "keeping last-good data" else "no usable data yet",
+        )
+    }
+
+    /**
+     * doLoad 抛出的非超时异常落到这里（exceptionally 线程上执行，无 IO）：发布终态错误。
+     * 否则 state 会停在 loading、界面永远转圈，违背"加载一定在期限内结束"的承诺。
+     */
+    private fun publishErrorState(request: LoadRequest, throwable: Throwable) {
+        val cause = if (throwable is CompletionException) throwable.cause ?: throwable else throwable
+        val message = cause.message?.takeIf(String::isNotBlank) ?: cause.javaClass.simpleName
+        val current = stateRef.get()
+        if (current.isLoaded && !current.isError) return
+        if (!request.keepDataOnTimeout) dataRef.set(ChangelogData.EMPTY)
+        stateRef.set(State(isLoaded = true, isError = true, errorMessage = message, remoteError = message))
+        generation.incrementAndGet()
+        Changelog.LOGGER.error("Changelog load failed unexpectedly", cause)
     }
 
     private fun loadFromRemote(request: LoadRequest, cacheFiles: CacheFiles): SourceResult {

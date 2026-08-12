@@ -2,6 +2,7 @@ package com.github.fanziyun.config
 
 import me.shedaniel.autoconfig.ConfigData
 import me.shedaniel.autoconfig.annotation.Config
+import me.shedaniel.autoconfig.annotation.ConfigEntry
 import me.shedaniel.cloth.clothconfig.shadowed.blue.endless.jankson.Comment
 
 @Config(name = "changelog363")
@@ -23,6 +24,10 @@ class ModConfig : ConfigData {
     @Comment("Enable automatic update checking")
     var enableVersionCheck: Boolean = true
 
+    @Comment("Seconds to wait for the remote changelog before falling back to cache/bundled (20-120)")
+    @ConfigEntry.BoundedDiscrete(min = 20, max = 120)
+    var loadTimeoutSeconds: Int = DEFAULT_LOAD_TIMEOUT_SECONDS
+
     @Comment("Distance in pixels between the version text and the bottom of the title screen")
     var versionYOffset: Int = 20
 
@@ -31,4 +36,9 @@ class ModConfig : ConfigData {
 
     @Comment("URL of the external link")
     var externalLinkUrl: String = "https://github.com/fanziyun/363changelog"
+
+    companion object {
+        /** 用户可配置的加载超时默认值；ChangelogLoader 的 API 级兜底默认与其保持一致 */
+        const val DEFAULT_LOAD_TIMEOUT_SECONDS = 30
+    }
 }

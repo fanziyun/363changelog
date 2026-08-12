@@ -54,6 +54,9 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
     private var smoothScroll = 0f
     private var hoveredIndex = -1
     private var refreshButton: Button? = null
+    // 上次见过的加载器数据版本。加载可能在超时发布之后才真正成功，届时 dataVersion 变化，
+    // 渲染帧据此重建列表，避免界面一直停在超时错误/空态。
+    private var seenDataVersion = -1L
 
     private val listRight: Int get() = width - 30
     private val listBottom: Int get() = height - 60
@@ -67,6 +70,7 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
     override fun init() {
         super.init()
         rebuildRows()
+        seenDataVersion = ChangelogLoader.dataVersion
         addNavigationButtons()
 
         refreshButton = addRenderableWidget(
@@ -118,6 +122,8 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
             client.execute {
                 if (client.screen !== this) return@execute
                 rebuildRows()
+                // 同步 seenDataVersion，避免下一帧的 dataVersion 轮询把刚重建过的行再重建一遍
+                seenDataVersion = ChangelogLoader.dataVersion
                 refreshButton?.active = true
             }
         }
@@ -126,6 +132,13 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
     private fun parseHttpUri(raw: String): URI? =
         runCatching { URI.create(raw.trim()) }.getOrNull()
             ?.takeIf { it.isAbsolute && (it.scheme.equals("http", true) || it.scheme.equals("https", true)) }
+
+    private fun rebuildRowsIfDataChanged() {
+        val version = ChangelogLoader.dataVersion
+        if (version == seenDataVersion) return
+        seenDataVersion = version
+        rebuildRows()
+    }
 
     private fun rebuildRows() {
         val contentRight = listRight - ROW_PADDING
@@ -166,6 +179,7 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
 
     override fun extractRenderState(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick)
+        rebuildRowsIfDataChanged()
         updateScroll(mouseX, mouseY)
 
         val titleText = title.string

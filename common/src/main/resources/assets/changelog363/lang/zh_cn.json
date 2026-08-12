@@ -35,6 +35,8 @@
   "text.autoconfig.changelog363.option.showOnTitle.@Tooltip": "在主菜单与暂停界面显示更新日志按钮",
   "text.autoconfig.changelog363.option.enableVersionCheck": "检查更新",
   "text.autoconfig.changelog363.option.enableVersionCheck.@Tooltip": "启用自动检查更新",
+  "text.autoconfig.changelog363.option.loadTimeoutSeconds": "加载超时（秒）",
+  "text.autoconfig.changelog363.option.loadTimeoutSeconds.@Tooltip": "等待远程更新日志的秒数，超时后回退到缓存/内置数据。加载永远不会阻塞进游戏，此值只限制\"加载中\"能显示多久（20-120）",
   "text.autoconfig.changelog363.option.versionYOffset": "版本号 Y 偏移",
   "text.autoconfig.changelog363.option.versionYOffset.@Tooltip": "版本号文字距标题界面底部的像素距离",
   "text.autoconfig.changelog363.option.externalLinkName": "外部链接名称",
