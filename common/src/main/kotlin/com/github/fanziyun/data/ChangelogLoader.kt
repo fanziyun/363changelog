@@ -111,6 +111,19 @@ object ChangelogLoader {
             .maxWithOrNull(SemVer.COMPARATOR)
             .orEmpty()
 
+    fun shutdown() {
+        synchronized(lock) {
+            activeLoad?.future?.cancel(true)
+            activeLoad = null
+            lastCompletedUrl = null
+        }
+        executor.shutdownNow()
+        runCatching { executor.awaitTermination(2, TimeUnit.SECONDS) }
+        dataRef.set(ChangelogData.EMPTY)
+        stateRef.set(State())
+        generation.incrementAndGet()
+    }
+
     fun load(
         remoteUrl: String,
         forceRefresh: Boolean = false,

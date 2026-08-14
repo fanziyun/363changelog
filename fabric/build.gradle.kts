@@ -6,12 +6,9 @@ plugins {
 base.archivesName.set("${rootProject.property("archives_base_name")}-fabric")
 
 val common = project(":common")
+val runtime = project(":runtime")
 
-// 直接把 common 的源码编进本 jar，而不是依赖 common 的产物。
-// 26.1 起 Minecraft 不再混淆，两个加载器引用的是同一套官方名字，
-// 所以共享源码不需要任何重映射中间层。
 sourceSets.main {
-    kotlin.srcDir(common.file("src/main/kotlin"))
     resources.srcDir(common.file("src/main/resources"))
 }
 
@@ -36,6 +33,28 @@ dependencies {
         exclude(group = "net.fabricmc.fabric-api")
     }
     implementation("com.terraformersmc:modmenu:${rootProject.property("modmenu_version")}")
+}
+
+val runtimeJarFile = runtime.layout.buildDirectory.file(
+    "libs/363changelog-runtime-${runtime.version}.jar",
+)
+
+tasks.jar {
+    dependsOn(":runtime:jar")
+    from(runtimeJarFile) {
+        into("runtime")
+        rename { "363changelog-runtime.jar" }
+    }
+}
+
+tasks.named("runClient") {
+    dependsOn(":runtime:jar")
+    doFirst {
+        val runtimeFile = runtimeJarFile.get().asFile
+        val target = layout.projectDirectory.dir("runs/client/config/changelog363").asFile
+        target.mkdirs()
+        runtimeFile.copyTo(target.resolve("runtime.jar"), overwrite = true)
+    }
 }
 
 tasks.processResources {

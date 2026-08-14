@@ -22,7 +22,7 @@
   },
   "mixins": [
     {
-      "config": "${mod_id}.mixins.json",
+      "config": "${mod_id}.fabric.mixins.json",
       "environment": "client"
     }
   ],

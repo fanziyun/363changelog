@@ -31,10 +31,11 @@ abstract class TitleScreenMixin : Screen(Component.literal("")) {
 
         val left = width / 2 - BUTTON_WIDTH / 2
         val buttonY = ButtonPlacement.belowExistingColumn(children(), height, left, left + BUTTON_WIDTH)
-            ?: (height / 4 + 48 + 72)
+            ?: ButtonPlacement.afterTitleColumn(height)
         addRenderableWidget(
             Button.builder(Component.translatable("menu.changelog363.button")) {
-                Minecraft.getInstance().setScreen(ChangelogOverviewScreen(Minecraft.getInstance().screen))
+                val client = Minecraft.getInstance()
+                client.setScreen(ChangelogOverviewScreen(client.screen))
             }.bounds(left, buttonY, BUTTON_WIDTH, ButtonPlacement.BUTTON_HEIGHT).build()
         )
     }

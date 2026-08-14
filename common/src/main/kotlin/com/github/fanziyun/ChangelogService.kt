@@ -1,46 +1,35 @@
 package com.github.fanziyun
 
-import com.github.fanziyun.config.ModConfig
 import com.github.fanziyun.data.ChangelogLoader
 import com.github.fanziyun.data.VersionChecker
-import me.shedaniel.autoconfig.AutoConfig
-import me.shedaniel.autoconfig.AutoConfigClient
-import me.shedaniel.autoconfig.serializer.GsonConfigSerializer
-import net.minecraft.client.gui.screens.Screen
+import com.github.fanziyun.platform.Platform
+import com.github.fanziyun.runtime.RuntimeSettings
+import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.atomic.AtomicBoolean
 
 object ChangelogService {
 
-    private val initialized = AtomicBoolean()
-
     @Volatile
-    var config: ModConfig? = null
+    var config: RuntimeSettings? = null
         private set
 
-    fun init() {
-        if (!initialized.compareAndSet(false, true)) return
+    fun init(gameDir: Path, settings: RuntimeSettings) {
+        Platform.configure(gameDir)
+        config = settings
 
-        AutoConfig.register(ModConfig::class.java) { definition, clazz ->
-            GsonConfigSerializer(definition, clazz)
-        }
-        config = AutoConfig.getConfigHolder(ModConfig::class.java).config
-
-        // 这里只是"点火"：真正加载跑在后台线程 363Changelog-Loader 上，本方法立即返回。
-        // 启动线程 / 渲染线程都不等待加载，游戏进标题界面、进世界都不会被 changelog 阻塞。
         Changelog.LOGGER.info(
-            "363Changelog initialized — changelog load runs asynchronously on the '363Changelog-Loader' background thread and never blocks game entry; load timeout {}s",
-            config?.loadTimeoutSeconds ?: ModConfig.DEFAULT_LOAD_TIMEOUT_SECONDS,
+            "363Changelog runtime initialized — load runs asynchronously; timeout {}s",
+            settings.loadTimeoutSeconds,
         )
         ensureChangelogLoaded()
     }
 
-    fun configScreen(parent: Screen?): Screen =
-        // 注意：Cloth 26.1.154 的 getConfigScreen 返回的是 Supplier<Screen>（不是 CompletableFuture），
-        // .get() 是在渲染线程上内联构建配置界面（有界、无网络/无 future 等待），风险低。
-        // 若将来依赖升级成返回 CompletableFuture 的重载，这个 .get() 会变成渲染线程上的真正阻塞，
-        // 必须改用 getNow()/isDone 之类的非阻塞写法。
-        AutoConfigClient.getConfigScreen(ModConfig::class.java, parent).get()
+    fun shutdown() {
+        ChangelogLoader.shutdown()
+        VersionChecker.reset()
+        config = null
+        Changelog.LOGGER.info("363Changelog runtime shut down")
+    }
 
     fun ensureChangelogLoaded(forceRefresh: Boolean = false): CompletableFuture<Boolean> {
         val cfg = config ?: return CompletableFuture.completedFuture(false)

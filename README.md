@@ -24,6 +24,7 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `modpackVersion` | String | `"1.1.0"` | 当前整合包版本号，用于与更新日志中的最高版本对比。默认值与内置 [changelog.json](common/src/main/resources/changelog.json) 的最新条目保持一致。 |
 | `showOnTitle` | Boolean | `true` | 是否在主菜单和暂停界面显示"更新日志"按钮。 |
 | `enableVersionCheck` | Boolean | `true` | 是否启用自动版本检测，检测到新版本时显示提示。 |
+| `loadTimeoutSeconds` | Int | `30` | 远程更新日志请求超时时间（20-120 秒）。 |
 | `versionYOffset` | Int | `20` | 主菜单版本文字距屏幕底部的像素距离。 |
 | `externalLinkName` | String | `"项目主页"` | 外部链接按钮的显示名称。留空则不显示该按钮。 |
 | `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | 外部链接按钮的目标 URL。 |
@@ -42,6 +43,7 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `modpackVersion` | String | `"1.1.0"` | Current modpack version, compared against the highest version in the changelog. Matches the newest entry in the bundled `changelog.json`. |
 | `showOnTitle` | Boolean | `true` | Show the "Changelog" button on the title screen and pause screen. |
 | `enableVersionCheck` | Boolean | `true` | Enable automatic version checking. Displays an indicator when a new version is available. |
+| `loadTimeoutSeconds` | Int | `30` | Timeout in seconds for the remote changelog request (20-120). |
 | `versionYOffset` | Int | `20` | Distance in pixels between the version text and the bottom of the title screen. |
 | `externalLinkName` | String | `"项目主页"` | Display name for the external link button. Leave blank to hide the button. |
 | `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | Target URL for the external link button. |
@@ -148,21 +150,35 @@ access_token 只保存在 `sessionStorage`，关闭标签页即失效。
 ### 项目结构
 
 ```
-common/     与加载器无关的全部代码：数据层、工具、两个界面、两个 mixin、配置类
-fabric/     Fabric 入口点 + ModMenu 集成 + Platform 实现
+common/     共享运行时代码：数据层、工具、两个界面和配置模型
+runtime/    可替换的独立 runtime JAR，不包含 Fabric Mixin
+fabric/     稳定 Fabric host、Mixin、Mod Menu 集成，并内嵌 runtime JAR
 neoforge/   NeoForge 入口点 + 配置界面注册 + Platform 实现
 ```
 
-`common` 用 ModDevGradle 的 **NeoForm 模式**编译，只对着原版 Minecraft，不带任何加载器。
-两个加载器子项目**直接把 `common` 的源码编进各自的 jar**（`kotlin.srcDir`），
-不依赖 `common` 的产物 —— Minecraft 从 26.1 起不再混淆，两边引用的是同一套官方名字，
-所以共享源码不需要任何重映射中间层。
+Fabric 的 `runtime` 子项目把 `common` 的运行时代码编译成独立 JAR；Fabric 主 JAR
+只保留稳定 host 和控制入口，并把 runtime 放在 `runtime/363changelog-runtime.jar`
+中。这样 Fabric Loader 已经定义的 entrypoint、Mixin 和 host 类不会参与热替换。
+NeoForge 仍沿用自己的加载器入口与构建路径。
 
 平台差异只有一处：[`Platform`](common/src/main/kotlin/com/github/fanziyun/platform/Platform.kt)
 接口的 `gameDir`（缓存目录），由各子项目通过 `META-INF/services` 注册实现。
 
-Mixin 也放在 `common`：Fabric 与 NeoForge 都内置 Fabric Mixin，
-两边各自在 `fabric.mod.json` / `neoforge.mods.toml` 里声明同一个 `changelog363.mixins.json`。
+Fabric host 使用 `changelog363.fabric.mixins.json`；这些 Mixin 属于稳定层，修改后必须重启。
+NeoForge 继续使用自己的 Mixin 声明。
+
+### Fabric runtime 热替换
+
+Fabric 版本要求 Mod Menu 作为前置。进入 **Mod Menu → 363Changelog** 后，
+点击 **Reload runtime JAR** 会执行一次完整的 runtime 卸载与加载：先停止旧
+runtime 的线程和缓存，再从 `config/changelog363/runtime.jar` 加载新版本。
+
+也可以在 Fabric Hot Reload 的主菜单界面中选择 `363changelog`，通过
+`/hotreload replace changelog363 <path-to-jar>` 传入新的独立 runtime JAR，
+或传入完整的 363Changelog mod JAR；后者会自动提取其中的嵌套 runtime。
+
+只有 runtime 内的代码、数据和界面会被替换。Fabric host、entrypoint、Mixin、
+配置注册和 Mod Menu 集成属于稳定层，修改这些部分仍需要重启 Minecraft。
 
 ### 常用命令
 

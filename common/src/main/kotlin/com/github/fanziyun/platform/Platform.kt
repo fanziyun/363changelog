@@ -16,7 +16,19 @@ interface Platform {
     val gameDir: Path
 
     companion object {
+        @Volatile
+        private var configuredGameDir: Path? = null
+
+        fun configure(gameDir: Path) {
+            configuredGameDir = gameDir.toAbsolutePath().normalize()
+        }
+
         val INSTANCE: Platform by lazy {
+            configuredGameDir?.let { configured ->
+                object : Platform {
+                    override val gameDir: Path get() = configured
+                }
+            } ?: run {
             // 必须显式传 classloader。ServiceLoader.load(Class) 用的是线程上下文类加载器，
             // 而这个 lazy 第一次被解析发生在 ChangelogLoader 的 CompletableFuture.supplyAsync 内，
             // 也就是 ForkJoinPool.commonPool 的工作线程上 —— 那些线程的上下文类加载器是系统
@@ -28,9 +40,10 @@ interface Platform {
                     IllegalStateException(
                         "No Platform implementation found — is META-INF/services missing from the jar?"
                     )
-                }
+            }
             Changelog.LOGGER.debug("Platform helper: {}", loaded.javaClass.name)
             loaded
+            }
         }
     }
 }
