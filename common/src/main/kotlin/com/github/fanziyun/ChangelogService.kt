@@ -42,28 +42,37 @@ object ChangelogService {
         AutoConfig.getConfigScreen(ModConfig::class.java, parent).get()
 
     /**
-     * 确保更新日志已加载，并在加载完成后立即执行版本检测。
+     * 确保更新日志已加载，并在加载成功后执行版本检测。
      *
      * 版本检测依赖已加载的数据，所以必须挂在加载完成的回调上——否则会读到空数据，
      * 导致首次进入游戏永远检测不到新版本。
+     *
+     * 只有真正成功才检测：超时兜底会把 future 正常完成（值为 false），此时手上大概率
+     * 还是空数据，照样去比较就会得出"已是最新版本"，在标题界面画出一行绿字，
+     * 而实际上什么都没加载到。这种情况下要把检测重置回"未完成"，界面就不下结论。
      *
      * @param forceRefresh true 时忽略缓存重新拉取（"刷新"按钮）
      */
     fun ensureChangelogLoaded(forceRefresh: Boolean = false): CompletableFuture<Boolean> {
         val cfg = config ?: return CompletableFuture.completedFuture(false)
-        // 下限对齐"单次远程请求最坏耗时"（connect 5s + read 10s ≈ 15s），防止正常慢速请求被误判超时；
-        // 上限兜底防误填超大值。超出范围的存储值由配置界面的 @BoundedDiscrete 拦截。
-        val timeoutMs = cfg.loadTimeoutSeconds.coerceIn(20, 120) * 1000L
         if (forceRefresh) VersionChecker.reset()
 
         val loading = if (forceRefresh) {
-            ChangelogLoader.load(cfg.changelogUrl, forceRefresh = true, timeoutMs = timeoutMs)
+            ChangelogLoader.load(cfg.changelogUrl, forceRefresh = true, timeoutMs = cfg.loadTimeoutMillis)
         } else {
-            ChangelogLoader.ensureLoaded(cfg.changelogUrl, timeoutMs = timeoutMs)
+            ChangelogLoader.ensureLoaded(cfg.changelogUrl, timeoutMs = cfg.loadTimeoutMillis)
         }
 
-        return loading.whenComplete { _, _ ->
-            if (cfg.enableVersionCheck) VersionChecker.check(cfg.modpackVersion)
+        return loading.whenComplete { success, exception ->
+            val currentConfig = config
+            if (
+                exception == null && success == true && !ChangelogLoader.isError &&
+                currentConfig?.enableVersionCheck == true
+            ) {
+                VersionChecker.check(currentConfig.modpackVersion)
+            } else {
+                VersionChecker.reset()
+            }
         }
     }
 }

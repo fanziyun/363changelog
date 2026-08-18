@@ -80,14 +80,9 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
         // 就会记下新版本号却渲染着旧数据，之后每帧都判定"没变化"而卡住不再收敛。
         seenDataVersion = ChangelogLoader.dataVersion
         rebuildRows()
-        // 标题/暂停界面触发的首次加载可能尚未结束；完成后回到客户端线程刷新当前界面。
-        // 否则用户过早打开本页时会一直看到空列表，只能手动点刷新。
-        ChangelogService.ensureChangelogLoaded().whenComplete { _, _ ->
-            val client = minecraft ?: return@whenComplete
-            client.execute {
-                if (client.screen === this@ChangelogOverviewScreen) rebuildRowsIfDataChanged()
-            }
-        }
+        // 标题/暂停界面触发的首次加载可能尚未结束。这里只管点火，不挂回调：
+        // render() 每帧都在轮询 dataVersion，加载一落地界面自然就收敛过来。
+        ChangelogService.ensureChangelogLoaded()
 
         val totalButtonWidth = 214
         val buttonLeft = width / 2 - totalButtonWidth / 2
@@ -122,8 +117,8 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
 
         addRenderableWidget(
             Button.builder(Component.translatable("screen.changelog363.refresh")) {
+                // 同样不挂回调：render() 的 dataVersion 轮询会接住结果
                 ChangelogService.ensureChangelogLoaded(forceRefresh = true)
-                    .thenRun { minecraft?.execute(::rebuildRowsIfDataChanged) }
             }
                 .bounds(width - 100, 10, 90, 20)
                 .tooltip(Tooltip.create(Component.translatable("screen.changelog363.refresh.tooltip")))

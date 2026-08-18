@@ -14,6 +14,14 @@ data class ChangelogData(
     val tagColors: Map<String, String> get() = rawTagColors.orEmpty()
     val entries: List<ChangelogEntry> get() = rawEntries.orEmpty()
 
+    /**
+     * 没有任何可展示的条目。
+     *
+     * 判空要看条目而不是 `== EMPTY`：`{"footer": "..."}` 这种只有页脚的文档结构上不等于
+     * [EMPTY]，但界面上同样什么都没有。加载器用它判断"手上还有没有值得保留的数据"。
+     */
+    val isEmpty: Boolean get() = entries.isEmpty()
+
     companion object {
         val EMPTY = ChangelogData()
     }
