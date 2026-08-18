@@ -30,6 +30,8 @@
   "text.autoconfig.changelog363.option.showOnTitle.@Tooltip": "Show the changelog button on the title and pause screens",
   "text.autoconfig.changelog363.option.enableVersionCheck": "Update Check",
   "text.autoconfig.changelog363.option.enableVersionCheck.@Tooltip": "Enable automatic update checking",
+  "text.autoconfig.changelog363.option.loadTimeoutSeconds": "Load Timeout (seconds)",
+  "text.autoconfig.changelog363.option.loadTimeoutSeconds.@Tooltip": "Seconds to wait for the remote changelog before falling back to cache/bundled. The load never blocks game entry; this only bounds how long the changelog UI can show \"loading\" (20-120)",
   "text.autoconfig.changelog363.option.versionYOffset": "Version Y Offset",
   "text.autoconfig.changelog363.option.versionYOffset.@Tooltip": "Distance in pixels between the version text and the bottom of the title screen",
   "text.autoconfig.changelog363.option.externalLinkName": "External Link Name",

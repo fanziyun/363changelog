@@ -61,6 +61,9 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
     private var targetScroll = 0
     private var smoothScroll = 0f
     private var hoveredIndex = -1
+    // 上次见过的加载器数据版本。加载可能在超时发布之后才真正成功，届时 dataVersion 变化，
+    // 渲染帧据此重建列表，避免界面一直停在超时错误/空态。
+    private var seenDataVersion = -1L
 
     private val listRight: Int get() = width - 30
     private val listBottom: Int get() = height - 60
@@ -73,13 +76,16 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
 
     override fun init() {
         super.init()
+        // 先取生成号再建行：反过来的话，若加载刚好在两句之间发布终态，
+        // 就会记下新版本号却渲染着旧数据，之后每帧都判定"没变化"而卡住不再收敛。
+        seenDataVersion = ChangelogLoader.dataVersion
         rebuildRows()
         // 标题/暂停界面触发的首次加载可能尚未结束；完成后回到客户端线程刷新当前界面。
         // 否则用户过早打开本页时会一直看到空列表，只能手动点刷新。
         ChangelogService.ensureChangelogLoaded().whenComplete { _, _ ->
             val client = minecraft ?: return@whenComplete
             client.execute {
-                if (client.screen === this@ChangelogOverviewScreen) rebuildRows()
+                if (client.screen === this@ChangelogOverviewScreen) rebuildRowsIfDataChanged()
             }
         }
 
@@ -117,7 +123,7 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
         addRenderableWidget(
             Button.builder(Component.translatable("screen.changelog363.refresh")) {
                 ChangelogService.ensureChangelogLoaded(forceRefresh = true)
-                    .thenRun { minecraft?.execute(::rebuildRows) }
+                    .thenRun { minecraft?.execute(::rebuildRowsIfDataChanged) }
             }
                 .bounds(width - 100, 10, 90, 20)
                 .tooltip(Tooltip.create(Component.translatable("screen.changelog363.refresh.tooltip")))
@@ -129,6 +135,19 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
     private fun parseHttpUri(raw: String): URI? =
         runCatching { URI.create(raw.trim()) }.getOrNull()
             ?.takeIf { it.isAbsolute && (it.scheme.equals("http", true) || it.scheme.equals("https", true)) }
+
+    /**
+     * 数据版本变了才重建行。
+     *
+     * 迟到的成功（超时兜底已发布错误态之后 doLoad 才真正返回）不会有任何回调通知本界面，
+     * 所以每帧轮询生成号是唯一能收敛的办法；版本没变时直接返回，避免每帧重新测量文本宽度。
+     */
+    private fun rebuildRowsIfDataChanged() {
+        val version = ChangelogLoader.dataVersion
+        if (version == seenDataVersion) return
+        seenDataVersion = version
+        rebuildRows()
+    }
 
     private fun rebuildRows() {
         // 内容右边界要比磁贴右边缘再收一点，否则日期会紧贴着磁贴边框
@@ -176,6 +195,7 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
     override fun render(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
         super.render(graphics, mouseX, mouseY, partialTick)
 
+        rebuildRowsIfDataChanged()
         clampScroll()
         smoothScroll += (targetScroll - smoothScroll) * SCROLL_SMOOTHING
         if (abs(smoothScroll - targetScroll) < 0.5f) smoothScroll = targetScroll.toFloat()

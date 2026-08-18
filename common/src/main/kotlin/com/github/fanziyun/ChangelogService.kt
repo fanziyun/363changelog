@@ -27,7 +27,12 @@ object ChangelogService {
         }
         config = AutoConfig.getConfigHolder(ModConfig::class.java).config
 
-        Changelog.LOGGER.info("363Changelog initialized")
+        // 这里只是"点火"：真正加载跑在后台线程上，本方法立即返回。
+        // 启动线程 / 渲染线程都不等待加载，游戏进标题界面、进世界都不会被 changelog 阻塞。
+        Changelog.LOGGER.info(
+            "363Changelog initialized — changelog load runs asynchronously and never blocks game entry; load timeout {}s",
+            config?.loadTimeoutSeconds ?: ModConfig.DEFAULT_LOAD_TIMEOUT_SECONDS,
+        )
         ensureChangelogLoaded()
     }
 
@@ -46,10 +51,16 @@ object ChangelogService {
      */
     fun ensureChangelogLoaded(forceRefresh: Boolean = false): CompletableFuture<Boolean> {
         val cfg = config ?: return CompletableFuture.completedFuture(false)
+        // 下限对齐"单次远程请求最坏耗时"（connect 5s + read 10s ≈ 15s），防止正常慢速请求被误判超时；
+        // 上限兜底防误填超大值。超出范围的存储值由配置界面的 @BoundedDiscrete 拦截。
+        val timeoutMs = cfg.loadTimeoutSeconds.coerceIn(20, 120) * 1000L
         if (forceRefresh) VersionChecker.reset()
 
-        val loading = if (forceRefresh) ChangelogLoader.load(cfg.changelogUrl, forceRefresh = true)
-        else ChangelogLoader.ensureLoaded(cfg.changelogUrl)
+        val loading = if (forceRefresh) {
+            ChangelogLoader.load(cfg.changelogUrl, forceRefresh = true, timeoutMs = timeoutMs)
+        } else {
+            ChangelogLoader.ensureLoaded(cfg.changelogUrl, timeoutMs = timeoutMs)
+        }
 
         return loading.whenComplete { _, _ ->
             if (cfg.enableVersionCheck) VersionChecker.check(cfg.modpackVersion)

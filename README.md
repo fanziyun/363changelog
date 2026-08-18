@@ -24,6 +24,7 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `modpackVersion` | String | `"1.1.0"` | 当前整合包版本号，用于与更新日志中的最高版本对比。默认值与内置 [changelog.json](common/src/main/resources/changelog.json) 的最新条目保持一致。 |
 | `showOnTitle` | Boolean | `true` | 是否在主菜单和暂停界面显示"更新日志"按钮。 |
 | `enableVersionCheck` | Boolean | `true` | 是否启用自动版本检测，检测到新版本时显示提示。 |
+| `loadTimeoutSeconds` | Int | `30` | 等待远程更新日志的秒数（可填 20–120），超时后回退到缓存/内置数据。加载全程在后台线程上，永远不会阻塞进游戏；此值只限制更新日志界面能停在"加载中"多久。 |
 | `versionYOffset` | Int | `20` | 主菜单版本文字距屏幕底部的像素距离。 |
 | `externalLinkName` | String | `"项目主页"` | 外部链接按钮的显示名称。留空则不显示该按钮。 |
 | `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | 外部链接按钮的目标 URL。 |
@@ -42,6 +43,7 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `modpackVersion` | String | `"1.1.0"` | Current modpack version, compared against the highest version in the changelog. Matches the newest entry in the bundled `changelog.json`. |
 | `showOnTitle` | Boolean | `true` | Show the "Changelog" button on the title screen and pause screen. |
 | `enableVersionCheck` | Boolean | `true` | Enable automatic version checking. Displays an indicator when a new version is available. |
+| `loadTimeoutSeconds` | Int | `30` | Seconds to wait for the remote changelog (20–120) before falling back to cache/bundled data. The load always runs on a background thread and never blocks game entry; this only bounds how long the changelog screen can stay on "loading". |
 | `versionYOffset` | Int | `20` | Distance in pixels between the version text and the bottom of the title screen. |
 | `externalLinkName` | String | `"项目主页"` | Display name for the external link button. Leave blank to hide the button. |
 | `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | Target URL for the external link button. |
