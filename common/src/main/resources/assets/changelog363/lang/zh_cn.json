@@ -15,6 +15,18 @@
   "screen.changelog363.refresh": "刷新",
   "screen.changelog363.refresh.tooltip": "重新获取远程更新日志",
 
+  "screen.changelog363.feedback": "反馈",
+  "screen.changelog363.feedback.title": "意见反馈",
+  "screen.changelog363.feedback.placeholder": "请输入您遇到的问题或建议…",
+  "screen.changelog363.feedback.label": "反馈内容",
+  "screen.changelog363.feedback.contact": "联系方式（可选）",
+  "screen.changelog363.feedback.submit": "提交",
+  "screen.changelog363.feedback.sending": "发送中…",
+  "screen.changelog363.feedback.success": "反馈已发送，感谢！",
+  "screen.changelog363.feedback.fail": "发送失败: %s",
+  "screen.changelog363.feedback.empty": "请先输入反馈内容",
+  "screen.changelog363.feedback.no_backend": "反馈后端未配置或缺少 Token，请联系作者",
+
   "changelog363.type.major": "重大更新",
   "changelog363.type.minor": "功能更新",
   "changelog363.type.patch": "修复补丁",
@@ -42,5 +54,15 @@
   "text.autoconfig.changelog363.option.externalLinkName": "外部链接名称",
   "text.autoconfig.changelog363.option.externalLinkName.@Tooltip": "外部链接显示名称",
   "text.autoconfig.changelog363.option.externalLinkUrl": "外部链接 URL",
-  "text.autoconfig.changelog363.option.externalLinkUrl.@Tooltip": "外部链接 URL"
+  "text.autoconfig.changelog363.option.externalLinkUrl.@Tooltip": "外部链接 URL",
+  "text.autoconfig.changelog363.option.feedbackEnabled": "显示反馈",
+  "text.autoconfig.changelog363.option.feedbackEnabled.@Tooltip": "在更新日志总览界面显示反馈按钮",
+  "text.autoconfig.changelog363.option.feedbackTitle": "反馈标题",
+  "text.autoconfig.changelog363.option.feedbackTitle.@Tooltip": "反馈表单的标题",
+  "text.autoconfig.changelog363.option.feedbackPlaceholder": "反馈占位文本",
+  "text.autoconfig.changelog363.option.feedbackPlaceholder.@Tooltip": "反馈输入框的占位提示文本",
+  "text.autoconfig.changelog363.option.feedbackUrl": "反馈 URL",
+  "text.autoconfig.changelog363.option.feedbackUrl.@Tooltip": "反馈 API 地址。GitHub: https://api.github.com/repos/<owner>/<repo>/issues；Gitee（国内可直连）: https://gitee.com/api/v5/repos/<owner>/<repo>/issues",
+  "text.autoconfig.changelog363.option.feedbackToken": "反馈 Token",
+  "text.autoconfig.changelog363.option.feedbackToken.@Tooltip": "API 令牌。GitHub 用 personal access token（repo 权限），Gitee 用 personal access token，分别以 Bearer / access_token 发送"
 }

@@ -27,11 +27,33 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `versionYOffset` | Int | `20` | 主菜单版本文字距屏幕底部的像素距离。 |
 | `externalLinkName` | String | `"项目主页"` | 外部链接按钮的显示名称。留空则不显示该按钮。 |
 | `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | 外部链接按钮的目标 URL。 |
+| `feedbackEnabled` | Boolean | `true` | 是否在更新日志总览界面显示「反馈」按钮。 |
+| `feedbackTitle` | String | `"意见反馈"` | 反馈表单标题。 |
+| `feedbackPlaceholder` | String | `"请输入您遇到的问题或建议…"` | 反馈输入框的占位提示文本。 |
+| `feedbackUrl` | String | `"https://api.github.com/repos/fanziyun/363changelog/issues"` | 反馈 API 地址。**GitHub**：`https://api.github.com/repos/<owner>/<repo>/issues`；**Gitee（国内可直连）**：`https://gitee.com/api/v5/repos/<owner>/<repo>/issues`。 |
+| `feedbackToken` | String | `""` | 反馈 API 令牌。GitHub 用 personal access token（`repo` 权限），Gitee 用 personal access token。留空时按钮可点，但提交会提示未配置。 |
 
 `changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/26.1.2/common/src/main/resources/changelog.json`
 
 数据来源按 **远程 URL → 本地缓存 → 模组内置 changelog.json** 的顺序回退，任一环节成功即停止；
 远程请求会带 `If-None-Match`，命中 304 时直接复用本地缓存。
+
+### 反馈（Feedback）
+
+更新日志总览界面底部有一个「反馈」按钮，点击会打开游戏内反馈表单（多行文本 + 可选联系方式）。
+提交后由模组在后台线程把反馈投递到配置的 **GitHub / Gitee** issue API，界面即时显示「发送中 / 成功 / 失败」。
+
+- **后端选择（国内加速）**：默认指向 GitHub（`api.github.com`）。若面向国内玩家、GitHub `api.github.com` 访问不佳，
+  把 `feedbackUrl` 改成 Gitee 的 API 地址即可，Gitee `gitee.com/api/v5` 国内可直连，无需任何代理。
+  `feedbackUrl` 中包含 `api.github.com` 走 GitHub，包含 `gitee.com/api/v5` 走 Gitee，其它地址会提示不支持。
+- **提交前会附带**：标题 `[整合包名] 玩家名: 内容前30字`；正文含反馈内容 + 玩家名 + 整合包版本 + 联系方式。
+- **需要作者配置 `feedbackToken`**。GitHub 用 Personal Access Token（勾选 `repo` 权限）；Gitee 用 Personal Access Token。
+  未配置 Token 时玩家仍能打开表单，但提交会提示「反馈后端未配置或缺少 Token」。
+
+> **安全提示**：反馈 Token 会包含在配置里分发给玩家，等同把「写 issue」权限交给客户端。
+> 建议使用权限最小的 / 一次性 Token，或专用机器人账号；进阶做法是把 Token 放在服务端转发端点
+> （Cloudflare Worker / Vercel 函数），客户端只提交到你自己的地址，本版本暂按「Token 进配置」实现。
+> 另注：常见 GitHub 镜像加速（ghproxy 等）只加速文件下载，无法渲染 issues 交互页面，故本功能改为「游戏内表单 + 可配置后端」。
 
 ### English
 
@@ -45,9 +67,33 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `versionYOffset` | Int | `20` | Distance in pixels between the version text and the bottom of the title screen. |
 | `externalLinkName` | String | `"项目主页"` | Display name for the external link button. Leave blank to hide the button. |
 | `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | Target URL for the external link button. |
+| `feedbackEnabled` | Boolean | `true` | Show the "Feedback" button on the changelog overview screen. |
+| `feedbackTitle` | String | `"意见反馈"` | Feedback form title. |
+| `feedbackPlaceholder` | String | `"请输入您遇到的问题或建议…"` | Placeholder text of the feedback field. |
+| `feedbackUrl` | String | `"https://api.github.com/repos/fanziyun/363changelog/issues"` | Feedback API URL. **GitHub**: `https://api.github.com/repos/<owner>/<repo>/issues`; **Gitee (China-accessible)**: `https://gitee.com/api/v5/repos/<owner>/<repo>/issues`. |
+| `feedbackToken` | String | `""` | Feedback API token. GitHub: personal access token (`repo` scope). Gitee: personal access token. If blank, the button opens the form but submitting says it isn't configured. |
 
 Sources fall back in order: **remote URL → local cache → bundled `changelog.json`**, stopping at the first success.
 Remote requests send `If-None-Match`, so a 304 reuses the local cache.
+
+### Feedback
+
+The overview screen has a "Feedback" button that opens an in-game form (multi-line text + optional contact).
+On submit the mod posts the feedback to the configured **GitHub / Gitee** issue API on a background thread and shows "sending / success / failure".
+
+- **Backend choice (China acceleration)**: defaults to GitHub (`api.github.com`). If your players are in China and
+  `api.github.com` is slow/unreachable, point `feedbackUrl` at Gitee's API — `gitee.com/api/v5` is directly reachable
+  in China and needs no proxy. URLs containing `api.github.com` use GitHub, containing `gitee.com/api/v5` use Gitee;
+  anything else reports "unsupported backend".
+- **Submitted content**: title `[packName] playerName: first-30-chars`; body = feedback + player name + pack version + contact.
+- **The author must set `feedbackToken`**: GitHub Personal Access Token (`repo` scope) or Gitee Personal Access Token.
+  Without a token the form still opens but submitting shows "backend or token not configured".
+
+> **Security note**: The token ships in the config distributed to players, which effectively hands "create issue" rights
+> to any client. Use a least-privilege / throwaway token or a dedicated bot account; the robust option is to host the token
+> on a server-side relay (Cloudflare Worker / Vercel function) and have the client submit to your own endpoint.
+> Note that common GitHub mirrors (ghproxy etc.) only speed up file downloads and cannot render interactive issue pages,
+> which is why this feature uses "in-game form + configurable backend" instead.
 
 ---
 

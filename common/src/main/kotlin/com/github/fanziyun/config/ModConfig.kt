@@ -37,6 +37,21 @@ class ModConfig : ConfigData {
     @Comment("URL of the external link")
     var externalLinkUrl: String = "https://github.com/fanziyun/363changelog"
 
+    @Comment("Show the in-game feedback button on the changelog overview screen")
+    var feedbackEnabled: Boolean = true
+
+    @Comment("Feedback form title")
+    var feedbackTitle: String = "意见反馈"
+
+    @Comment("Feedback text field placeholder")
+    var feedbackPlaceholder: String = "请输入您遇到的问题或建议…"
+
+    @Comment("Feedback API URL. Use https://api.github.com/repos/<owner>/<repo>/issues (GitHub) or https://gitee.com/api/v5/repos/<owner>/<repo>/issues (Gitee, China-accessible)")
+    var feedbackUrl: String = "https://api.github.com/repos/fanziyun/363changelog/issues"
+
+    @Comment("API token. GitHub: personal access token (repo scope). Gitee: personal access token. Sent as Authorization: Bearer (GitHub) / access_token (Gitee)")
+    var feedbackToken: String = ""
+
     companion object {
         /** 用户可配置的加载超时默认值；ChangelogLoader 的 API 级兜底默认与其保持一致 */
         const val DEFAULT_LOAD_TIMEOUT_SECONDS = 30

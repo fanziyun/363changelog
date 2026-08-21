@@ -15,6 +15,18 @@
   "screen.changelog363.refresh": "Refresh",
   "screen.changelog363.refresh.tooltip": "Re-fetch the remote changelog",
 
+  "screen.changelog363.feedback": "Feedback",
+  "screen.changelog363.feedback.title": "Feedback",
+  "screen.changelog363.feedback.placeholder": "Describe the issue or suggestion…",
+  "screen.changelog363.feedback.label": "Feedback",
+  "screen.changelog363.feedback.contact": "Contact (optional)",
+  "screen.changelog363.feedback.submit": "Submit",
+  "screen.changelog363.feedback.sending": "Sending…",
+  "screen.changelog363.feedback.success": "Feedback sent, thank you!",
+  "screen.changelog363.feedback.fail": "Failed to send: %s",
+  "screen.changelog363.feedback.empty": "Please enter some feedback first",
+  "screen.changelog363.feedback.no_backend": "Feedback backend or token not configured. Please contact the author",
+
   "changelog363.type.major": "Major Update",
   "changelog363.type.minor": "Feature Update",
   "changelog363.type.patch": "Patch",
@@ -42,5 +54,15 @@
   "text.autoconfig.changelog363.option.externalLinkName": "External Link Name",
   "text.autoconfig.changelog363.option.externalLinkName.@Tooltip": "Display name of the external link",
   "text.autoconfig.changelog363.option.externalLinkUrl": "External Link URL",
-  "text.autoconfig.changelog363.option.externalLinkUrl.@Tooltip": "URL of the external link"
+  "text.autoconfig.changelog363.option.externalLinkUrl.@Tooltip": "URL of the external link",
+  "text.autoconfig.changelog363.option.feedbackEnabled": "Show Feedback",
+  "text.autoconfig.changelog363.option.feedbackEnabled.@Tooltip": "Show the feedback button on the changelog overview screen",
+  "text.autoconfig.changelog363.option.feedbackTitle": "Feedback Title",
+  "text.autoconfig.changelog363.option.feedbackTitle.@Tooltip": "Title of the feedback form",
+  "text.autoconfig.changelog363.option.feedbackPlaceholder": "Feedback Placeholder",
+  "text.autoconfig.changelog363.option.feedbackPlaceholder.@Tooltip": "Placeholder text of the feedback field",
+  "text.autoconfig.changelog363.option.feedbackUrl": "Feedback URL",
+  "text.autoconfig.changelog363.option.feedbackUrl.@Tooltip": "Feedback API URL. GitHub: https://api.github.com/repos/<owner>/<repo>/issues; Gitee (China-accessible): https://gitee.com/api/v5/repos/<owner>/<repo>/issues",
+  "text.autoconfig.changelog363.option.feedbackToken": "Feedback Token",
+  "text.autoconfig.changelog363.option.feedbackToken.@Tooltip": "API token. GitHub: personal access token (repo scope). Gitee: personal access token. Sent as Bearer (GitHub) / access_token (Gitee)"
 }
