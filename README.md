@@ -29,9 +29,10 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | 外部链接按钮的目标 URL。 |
 | `feedbackEnabled` | Boolean | `true` | 是否在更新日志总览界面显示「反馈」按钮。 |
 | `feedbackTitle` | String | `"意见反馈"` | 反馈表单标题。 |
-| `feedbackPlaceholder` | String | `"请输入您遇到的问题或建议…"` | 反馈输入框的占位提示文本。 |
-| `feedbackUrl` | String | `"https://api.github.com/repos/fanziyun/363changelog/issues"` | 反馈 API 地址。**GitHub**：`https://api.github.com/repos/<owner>/<repo>/issues`；**Gitee（国内可直连）**：`https://gitee.com/api/v5/repos/<owner>/<repo>/issues`。 |
-| `feedbackToken` | String | `""` | 反馈 API 令牌。GitHub 用 personal access token（`repo` 权限），Gitee 用 personal access token。留空时按钮可点，但提交会提示未配置。 |
+| `feedbackTitlePlaceholder` | String | `"一句话概括您的问题"` | 反馈标题输入框的占位提示文本。 |
+| `feedbackPlaceholder` | String | `"详细描述您遇到的问题或建议…"` | 反馈内容输入框的占位提示文本。 |
+| `feedbackRepo` | String | `"fanziyun/363changelog"` | 反馈提交到的 GitHub 仓库（`owner/repo`）。**需为公开仓库**，玩家才能用自己的账号创建 issue。 |
+| `githubClientId` | String | `""` | 你在 GitHub 创建的 OAuth App 的 `client_id`（公开值），用于**设备流登录**。请勿填写 Secret。 |
 
 `changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/26.1.2/common/src/main/resources/changelog.json`
 
@@ -40,20 +41,22 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 
 ### 反馈（Feedback）
 
-更新日志总览界面底部有一个「反馈」按钮，点击会打开游戏内反馈表单（多行文本 + 可选联系方式）。
-提交后由模组在后台线程把反馈投递到配置的 **GitHub / Gitee** issue API，界面即时显示「发送中 / 成功 / 失败」。
+更新日志总览界面底部有一个「反馈」按钮，点击打开游戏内反馈表单，玩家填写**标题 + 内容（+ 可选联系方式）**。
+提交后由模组在后台线程把反馈作为 **GitHub issue** 投递到配置的仓库，界面即时显示「登录中 / 发送中 / 成功 / 失败」。
 
-- **后端选择（国内加速）**：默认指向 GitHub（`api.github.com`）。若面向国内玩家、GitHub `api.github.com` 访问不佳，
-  把 `feedbackUrl` 改成 Gitee 的 API 地址即可，Gitee `gitee.com/api/v5` 国内可直连，无需任何代理。
-  `feedbackUrl` 中包含 `api.github.com` 走 GitHub，包含 `gitee.com/api/v5` 走 Gitee，其它地址会提示不支持。
-- **提交前会附带**：标题 `[整合包名] 玩家名: 内容前30字`；正文含反馈内容 + 玩家名 + 整合包版本 + 联系方式。
-- **需要作者配置 `feedbackToken`**。GitHub 用 Personal Access Token（勾选 `repo` 权限）；Gitee 用 Personal Access Token。
-  未配置 Token 时玩家仍能打开表单，但提交会提示「反馈后端未配置或缺少 Token」。
+- **只面向 GitHub**：固定走 `api.github.com`，不切换到其它平台（GitHub API 对国际用户已足够快）。
+- **登录用 GitHub 设备流（Device Flow），不需要也不收集 PAT**：作者只需提供一个 GitHub **OAuth App** 的公开 `client_id`；
+  玩家首次提交时模组弹出一个授权码并打开浏览器，玩家在浏览器里用自己的 GitHub 账号确认后，模组轮询换到属于玩家本人的 token。
+  token 会缓存到本地（过期自动刷新），后续提交无需重复登录。
+- **目标仓库必须是公开仓库**：GitHub 文档「任何对仓库拥有 pull 权限的用户都能创建 issue」，公开仓库即所有登录用户，
+  所以玩家用自己的账号就能在作者的公开仓库里开 issue。
+- **提交内容**：标题来自玩家填的「标题」字段（留空则自动生成 `[整合包名] 玩家名: 内容前30字`）；正文 = 内容 + 玩家名 + 整合包版本 + 联系方式。玩家昵称/版本信息自动附带。
+- **作者需要配置**：`githubClientId`（GitHub OAuth App 的 Client ID，公开即可，无需保密）与 `feedbackRepo`（目标仓库）。
+  未配置时玩家仍能打开表单，但提交会提示「联系作者」。
 
-> **安全提示**：反馈 Token 会包含在配置里分发给玩家，等同把「写 issue」权限交给客户端。
-> 建议使用权限最小的 / 一次性 Token，或专用机器人账号；进阶做法是把 Token 放在服务端转发端点
-> （Cloudflare Worker / Vercel 函数），客户端只提交到你自己的地址，本版本暂按「Token 进配置」实现。
-> 另注：常见 GitHub 镜像加速（ghproxy 等）只加速文件下载，无法渲染 issues 交互页面，故本功能改为「游戏内表单 + 可配置后端」。
+> **安全说明**：token 属于玩家本人、只存本机，作者无需分发任何密钥，也无需在配置文件里放 PAT。
+> 当然 token 不进入任何人（包括作者）的配置，因此没有「把写 issue 权限交给客户端」的问题。
+> 设备流要求玩家有 GitHub 账号并在浏览器完成一次授权——如果希望「无 GitHub 账号也能反馈」，可改走自建/第三方反馈端点。
 
 ### English
 
@@ -69,31 +72,34 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | Target URL for the external link button. |
 | `feedbackEnabled` | Boolean | `true` | Show the "Feedback" button on the changelog overview screen. |
 | `feedbackTitle` | String | `"意见反馈"` | Feedback form title. |
-| `feedbackPlaceholder` | String | `"请输入您遇到的问题或建议…"` | Placeholder text of the feedback field. |
-| `feedbackUrl` | String | `"https://api.github.com/repos/fanziyun/363changelog/issues"` | Feedback API URL. **GitHub**: `https://api.github.com/repos/<owner>/<repo>/issues`; **Gitee (China-accessible)**: `https://gitee.com/api/v5/repos/<owner>/<repo>/issues`. |
-| `feedbackToken` | String | `""` | Feedback API token. GitHub: personal access token (`repo` scope). Gitee: personal access token. If blank, the button opens the form but submitting says it isn't configured. |
+| `feedbackTitlePlaceholder` | String | `"一句话概括您的问题"` | Placeholder of the feedback title field. |
+| `feedbackPlaceholder` | String | `"详细描述您遇到的问题或建议…"` | Placeholder of the feedback content field. |
+| `feedbackRepo` | String | `"fanziyun/363changelog"` | Target GitHub repo (`owner/repo`). **Must be public** so players can create issues with their own account. |
+| `githubClientId` | String | `""` | The public `client_id` of your GitHub **OAuth App**, used for the **device-flow login**. Never fill in the secret. |
 
 Sources fall back in order: **remote URL → local cache → bundled `changelog.json`**, stopping at the first success.
 Remote requests send `If-None-Match`, so a 304 reuses the local cache.
 
 ### Feedback
 
-The overview screen has a "Feedback" button that opens an in-game form (multi-line text + optional contact).
-On submit the mod posts the feedback to the configured **GitHub / Gitee** issue API on a background thread and shows "sending / success / failure".
+The overview screen has a "Feedback" button that opens an in-game form where players enter a **title + content (+ optional contact)**.
+On submit the mod posts it as a **GitHub issue** to the configured repo on a background thread and shows "logging in / sending / success / failure".
 
-- **Backend choice (China acceleration)**: defaults to GitHub (`api.github.com`). If your players are in China and
-  `api.github.com` is slow/unreachable, point `feedbackUrl` at Gitee's API — `gitee.com/api/v5` is directly reachable
-  in China and needs no proxy. URLs containing `api.github.com` use GitHub, containing `gitee.com/api/v5` use Gitee;
-  anything else reports "unsupported backend".
-- **Submitted content**: title `[packName] playerName: first-30-chars`; body = feedback + player name + pack version + contact.
-- **The author must set `feedbackToken`**: GitHub Personal Access Token (`repo` scope) or Gitee Personal Access Token.
-  Without a token the form still opens but submitting shows "backend or token not configured".
+- **GitHub only**: it always uses `api.github.com` and does not switch to another platform — the GitHub API is fast enough for international users.
+- **Login via GitHub Device Flow — no PAT needed**: the author only provides the public `client_id` of a GitHub **OAuth App**.
+  On a player's first submit the mod shows an authorization code and opens the browser; after the player confirms with their own
+  GitHub account, the mod polls for a token that belongs to that player. The token is cached locally (auto-refreshed when expired),
+  so later submissions need no re-login.
+- **The target repo must be public**: GitHub docs say "any user with pull access to a repository can create an issue", and a public
+  repo gives every signed-in user pull access, so players can open issues on your public repo with their own account.
+- **Submitted content**: title comes from the "Title" field (auto-generated as `[packName] playerName: first-30-chars` if left blank);
+  body = content + player name + pack version + contact. Nickname and version are attached automatically.
+- **The author must set** `githubClientId` (public OAuth App Client ID — no secret) and `feedbackRepo` (target repo).
+  Without them the form still opens but submitting says to contact the author.
 
-> **Security note**: The token ships in the config distributed to players, which effectively hands "create issue" rights
-> to any client. Use a least-privilege / throwaway token or a dedicated bot account; the robust option is to host the token
-> on a server-side relay (Cloudflare Worker / Vercel function) and have the client submit to your own endpoint.
-> Note that common GitHub mirrors (ghproxy etc.) only speed up file downloads and cannot render interactive issue pages,
-> which is why this feature uses "in-game form + configurable backend" instead.
+> **Security note**: the token belongs to the player and stays on their machine — the author never distributes a secret and no PAT
+> goes into the config. This avoids handing "create issue" rights to every client. The tradeoff is that players need a GitHub account
+> and one browser authorization; if you need feedback from players without GitHub, use a self-hosted/third-party feedback endpoint instead.
 
 ---
 

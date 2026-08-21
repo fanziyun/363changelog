@@ -98,7 +98,7 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
         if (linkName != null && linkUri != null) {
             buttons += Component.literal(linkName) to { ConfirmLinkScreen.confirmLinkNow(this, linkUri) }
         }
-        if (config?.feedbackEnabled == true && !config.feedbackUrl.isBlank()) {
+        if (config?.feedbackEnabled == true && !config.feedbackRepo.isBlank()) {
             buttons += Component.translatable("screen.changelog363.feedback") to {
                 minecraft.setScreen(FeedbackScreen(this))
             }
