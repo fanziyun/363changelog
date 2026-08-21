@@ -1,0 +1,37 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Grant execute permission to gradlew
+        run: chmod +x gradlew
+
+      - name: Build Fabric + NeoForge jars
+        # 项目用 Gradle 9.x + JDK 25；NeoForm 的 decompile 会另起一个约 4G 的 JVM，
+        # 这里把 Gradle 守护进程的堆压到 2G，避免在 7G 的 runner 上撞内存上限。
+        run: ./gradlew build -Dorg.gradle.jvmargs=-Xmx2G
+
+      - name: Upload built jars
+        uses: actions/upload-artifact@v4
+        with:
+          name: 363changelog-jars
+          path: |
+            fabric/build/libs/*.jar
+            neoforge/build/libs/*.jar
+          if-no-files-found: error
