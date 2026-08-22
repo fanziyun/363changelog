@@ -274,7 +274,7 @@ class FeedbackScreen(private val parentScreen: Screen?) :
         updateSubmitState()
 
         val cfg = config
-        val playerName = minecraft.player?.name?.string ?: "Player"
+        val playerName = resolvePlayerName()
         val titleText = titleBox?.getValue()?.trim()?.takeIf(String::isNotEmpty)
             ?: buildFallbackTitle(cfg?.packName.orEmpty(), playerName, contentBox?.getValue().orEmpty())
         val body = IssueBody.build(
@@ -502,6 +502,12 @@ class FeedbackScreen(private val parentScreen: Screen?) :
     }
 
     // ---- 工具 ----
+
+    /** 反馈界面通常从标题界面打开，此时 `minecraft.player` 还是 null，只有账号会话里才有玩家名。 */
+    private fun resolvePlayerName(): String =
+        minecraft.player?.name?.string?.takeIf(String::isNotBlank)
+            ?: minecraft.user?.name?.takeIf(String::isNotBlank)
+            ?: "Player"
 
     private fun buildFallbackTitle(packName: String, playerName: String, content: String): String {
         val preview = content.trim().replace(Regex("\\s+"), " ")
