@@ -31,7 +31,7 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `feedbackTitle` | String | `"意见反馈"` | 反馈表单标题。 |
 | `feedbackTitlePlaceholder` | String | `"一句话概括您的问题"` | 反馈标题输入框的占位提示文本。 |
 | `feedbackPlaceholder` | String | `"详细描述您遇到的问题或建议…"` | 反馈内容输入框的占位提示文本。 |
-| `feedbackEndpoints` | List | 当前 GitHub 服务 | 反馈服务列表。每项配置显示名称、API Base URL、`owner/repo` 仓库，以及 OAuth 授权、Device、Token URL、Client ID 和可选 Secret。 |
+| `feedbackEndpoints` | List | 当前 GitHub 服务 | 反馈服务列表。每项配置显示名称、API Base URL、`owner/repo` 仓库、是否启用 OAuth，以及 OAuth 授权、Device、Token URL、Client ID 和可选 Secret。 |
 
 `changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/26.1.2/common/src/main/resources/changelog.json`
 
@@ -73,7 +73,7 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `feedbackTitle` | String | `"意见反馈"` | Feedback form title. |
 | `feedbackTitlePlaceholder` | String | `"一句话概括您的问题"` | Placeholder of the feedback title field. |
 | `feedbackPlaceholder` | String | `"详细描述您遇到的问题或建议…"` | Placeholder of the feedback content field. |
-| `feedbackEndpoints` | List | Current GitHub service | List of feedback services. Each item contains a display name, API base URL, `owner/repo`, OAuth authorization/device/token URLs, client ID, and optional secret. |
+| `feedbackEndpoints` | List | Current GitHub service | List of feedback services. Each item contains a display name, API base URL, `owner/repo`, an OAuth enable flag, OAuth authorization/device/token URLs, client ID, and optional secret. |
 
 Sources fall back in order: **remote URL → local cache → bundled `changelog.json`**, stopping at the first success.
 Remote requests send `If-None-Match`, so a 304 reuses the local cache.

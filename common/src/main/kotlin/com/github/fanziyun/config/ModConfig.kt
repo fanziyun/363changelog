@@ -5,6 +5,8 @@ import me.shedaniel.autoconfig.annotation.Config
 import me.shedaniel.autoconfig.annotation.ConfigEntry
 import me.shedaniel.cloth.clothconfig.shadowed.blue.endless.jankson.Comment
 
+const val DEFAULT_LOAD_TIMEOUT_SECONDS = 30
+
 @Config(name = "changelog363")
 class ModConfig : ConfigData {
 
@@ -17,6 +19,9 @@ class ModConfig : ConfigData {
 
         @Comment("Target repository in owner/repo form")
         var repo: String = "fanziyun/363changelog"
+
+        @Comment("Whether this endpoint supports OAuth. Disable for PAT-only services.")
+        var oauthEnabled: Boolean = true
 
         @Comment("OAuth device-flow client ID; leave blank to disable OAuth for this endpoint")
         var oauthClientId: String = "Ov23liAM2iYE4alTOVOj"
@@ -78,8 +83,4 @@ class ModConfig : ConfigData {
     @Comment("Feedback services. Each entry can target a different GitHub/GitHub Enterprise API.")
     var feedbackEndpoints: MutableList<FeedbackEndpoint> = mutableListOf(FeedbackEndpoint())
 
-    companion object {
-        /** 用户可配置的加载超时默认值；ChangelogLoader 的 API 级兜底默认与其保持一致 */
-        const val DEFAULT_LOAD_TIMEOUT_SECONDS = 30
-    }
 }

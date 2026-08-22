@@ -29,22 +29,23 @@ class FeedbackScreen(private val parentScreen: Screen?) :
     Screen(Component.translatable("screen.changelog363.feedback.title")) {
 
     private companion object {
-        const val PANEL_W = 340
+        const val PANEL_W = 380
         const val PANEL_TOP = 38
-        const val PANEL_BOTTOM = 242
+        const val PANEL_BOTTOM = 300
         const val ENDPOINT_Y = 42
         const val AUTH_Y = 68
-        const val TITLE_LABEL_Y = 93
-        const val TITLE_BOX_Y = 104
+        const val PAT_Y = 96
+        const val TITLE_LABEL_Y = 128
+        const val TITLE_BOX_Y = 140
         const val TITLE_BOX_H = 20
-        const val CONTENT_LABEL_Y = 130
-        const val CONTENT_BOX_Y = 141
-        const val CONTENT_BOX_H = 48
-        const val CONTACT_LABEL_Y = 194
-        const val CONTACT_BOX_Y = 205
+        const val CONTENT_LABEL_Y = 174
+        const val CONTENT_BOX_Y = 186
+        const val CONTENT_BOX_H = 62
+        const val CONTACT_LABEL_Y = 258
+        const val CONTACT_BOX_Y = 270
         const val CONTACT_BOX_H = 20
-        const val STATUS_Y = 248
-        const val LOGIN_INFO_Y = 264
+        const val STATUS_Y = 306
+        const val LOGIN_INFO_Y = 322
         const val BUTTON_WIDTH = 100
         const val BUTTON_GAP = 4
         const val BUTTON_Y_MARGIN = 30
@@ -52,13 +53,15 @@ class FeedbackScreen(private val parentScreen: Screen?) :
         const val MAX_CONTENT_CHARS = 4000
         const val MAX_CONTACT_CHARS = 100
         const val SMALL_GAP = 8
-        const val ROW_BACKGROUND = 0x1AFFFFFF
+        const val ROW_BACKGROUND = 0x66000000
+        const val SECTION_BACKGROUND = 0x33000000
+        const val FIELD_BACKGROUND = 0x22000000
         const val ROW_ACCENT = 0xFF55FF55.toInt() // ColorUtil.GREEN
     }
 
     private enum class LoginState { NOT_LOGGED, LOGGING_IN, LOGGED_IN, LOGIN_FAILED }
     private enum class SubmitState { IDLE, SENDING }
-    private enum class AuthMode { DEVICE_FLOW, LOCAL_CALLBACK, PAT }
+    private enum class AuthMode { OAUTH, PAT }
 
     private var titleBox: EditBox? = null
     private var contentBox: MultiLineEditBox? = null
@@ -66,6 +69,7 @@ class FeedbackScreen(private val parentScreen: Screen?) :
     private var submitButton: Button? = null
     private var endpointSelector: CycleButton<FeedbackEndpoint>? = null
     private var authSelector: CycleButton<AuthMode>? = null
+    private var deviceFlowBox: Checkbox? = null
     private var patBox: EditBox? = null
     private var savePatBox: Checkbox? = null
 
@@ -100,19 +104,23 @@ class FeedbackScreen(private val parentScreen: Screen?) :
             endpointSelector = addRenderableWidget(
                 CycleButton.builder<FeedbackEndpoint>({ Component.literal(it.displayName.ifBlank { it.baseUrl }) }, configuredEndpoints[0])
                     .withValues(configuredEndpoints)
-                    .create(left + SMALL_GAP, ENDPOINT_Y, PANEL_W - SMALL_GAP * 2, 20, Component.literal("反馈服务")) { _, _ -> updateLoginStatus() }
+                    .create(left + SMALL_GAP, ENDPOINT_Y, PANEL_W - SMALL_GAP * 2, 20, Component.translatable("screen.changelog363.feedback.service")) { _, _ -> updateAuthWidgets() }
             )
         }
         authSelector = addRenderableWidget(
             CycleButton.builder<AuthMode>({
-                when (it) {
-                    AuthMode.DEVICE_FLOW -> Component.literal("OAuth Device Flow")
-                    AuthMode.LOCAL_CALLBACK -> Component.literal("OAuth Local Callback")
-                    AuthMode.PAT -> Component.literal("PAT")
-                }
-            }, AuthMode.DEVICE_FLOW)
+                if (it == AuthMode.OAUTH) Component.translatable("screen.changelog363.feedback.auth.oauth")
+                else Component.translatable("screen.changelog363.feedback.auth.pat")
+            }, AuthMode.OAUTH)
                 .withValues(AuthMode.entries)
-                .create(left + SMALL_GAP, AUTH_Y, 100, 20, Component.literal("鉴权方式")) { _, _ -> updateAuthWidgets() }
+                .create(left + SMALL_GAP, AUTH_Y, 116, 20, Component.translatable("screen.changelog363.feedback.auth")) { _, _ -> updateAuthWidgets() }
+        )
+        deviceFlowBox = addRenderableWidget(
+            Checkbox.builder(Component.translatable("screen.changelog363.feedback.use_device_flow"), font)
+                .pos(left + 136, AUTH_Y)
+                .selected(true)
+                .onValueChange { _, _ -> updateSubmitState() }
+                .build()
         )
 
         val title = EditBox(
@@ -124,7 +132,7 @@ class FeedbackScreen(private val parentScreen: Screen?) :
             Component.translatable("screen.changelog363.feedback.title_label"),
         )
         title.setMaxLength(MAX_TITLE_CHARS)
-        title.setBordered(false)
+        title.setBordered(true)
         title.setTextColor(ColorUtil.WHITE)
         title.setHint(Component.literal(titlePlaceholder))
         title.setResponder { updateSubmitState() }
@@ -134,7 +142,7 @@ class FeedbackScreen(private val parentScreen: Screen?) :
             .setX(left + SMALL_GAP)
             .setY(CONTENT_BOX_Y)
             .setPlaceholder(Component.literal(contentPlaceholder))
-            .setShowBackground(false)
+            .setShowBackground(true)
             .setShowDecorations(true)
             .setTextColor(ColorUtil.WHITE)
             .build(font, PANEL_W - SMALL_GAP * 2, CONTENT_BOX_H, Component.translatable("screen.changelog363.feedback.label"))
@@ -151,22 +159,22 @@ class FeedbackScreen(private val parentScreen: Screen?) :
             Component.translatable("screen.changelog363.feedback.contact"),
         )
         contact.setMaxLength(MAX_CONTACT_CHARS)
-        contact.setBordered(false)
+        contact.setBordered(true)
         contact.setTextColor(ColorUtil.WHITE)
         contact.setHint(Component.translatable("screen.changelog363.feedback.contact_hint"))
         contactBox = addRenderableWidget(contact)
 
-        val pat = EditBox(font, left + 108, AUTH_Y, 126, 20, Component.literal("PAT"))
+        val pat = EditBox(font, left + SMALL_GAP, PAT_Y, 216, 20, Component.literal("PAT"))
         pat.setMaxLength(500)
-        pat.setBordered(false)
+        pat.setBordered(true)
         pat.setTextColor(ColorUtil.WHITE)
-        pat.setSuggestion("Personal Access Token")
+        pat.setHint(Component.translatable("screen.changelog363.feedback.pat_hint"))
         pat.addFormatter { value, _ -> FormattedCharSequence.forward("•".repeat(value.length), Style.EMPTY) }
         pat.setResponder { updateSubmitState() }
         patBox = addRenderableWidget(pat)
         savePatBox = addRenderableWidget(
-            Checkbox.builder(Component.literal("保存 PAT 到本地"), font)
-                .pos(left + 238, AUTH_Y)
+            Checkbox.builder(Component.translatable("screen.changelog363.feedback.save_pat"), font)
+                .pos(left + 232, PAT_Y)
                 .selected(false)
                 .build()
         )
@@ -195,7 +203,7 @@ class FeedbackScreen(private val parentScreen: Screen?) :
     private fun onSubmit() {
         val endpoint = endpointSelector?.getValue()
         if (endpoint == null) {
-            setStatus(Component.literal("未配置反馈服务"), ColorUtil.YELLOW)
+            setStatus(Component.translatable("screen.changelog363.feedback.no_service"), ColorUtil.YELLOW)
             return
         }
         if (contentBox?.getValue().isNullOrBlank()) {
@@ -206,7 +214,7 @@ class FeedbackScreen(private val parentScreen: Screen?) :
         if (authSelector?.getValue() == AuthMode.PAT) {
             val pat = patBox?.getValue()?.trim().orEmpty().ifBlank { PersonalAccessTokens.load(endpoint.storageKey()).orEmpty() }
             if (pat.isBlank()) {
-                setStatus(Component.literal("PAT 未填写"), ColorUtil.YELLOW)
+                setStatus(Component.translatable("screen.changelog363.feedback.pat_empty"), ColorUtil.YELLOW)
                 return
             }
             if (savePatBox?.selected() == true) PersonalAccessTokens.save(endpoint.storageKey(), pat)
@@ -215,12 +223,16 @@ class FeedbackScreen(private val parentScreen: Screen?) :
         }
 
         if (endpoint.oauthClientId.isBlank()) {
-            setStatus(Component.literal("当前反馈服务未配置 OAuth Client ID"), ColorUtil.YELLOW)
+            setStatus(Component.translatable("screen.changelog363.feedback.oauth_no_client_id"), ColorUtil.YELLOW)
+            return
+        }
+        if (!endpoint.oauthEnabled) {
+            setStatus(Component.translatable("screen.changelog363.feedback.pat_only"), ColorUtil.YELLOW)
             return
         }
         val existing = GitHubOAuth.load(endpoint.storageKey())
         val (_, tokenUrl) = try { endpoint.oauthUrls() } catch (exception: IllegalArgumentException) {
-            setStatus(Component.literal(exception.message ?: "OAuth URL 无效"), ColorUtil.YELLOW)
+            setStatus(Component.translatable("screen.changelog363.feedback.oauth_invalid_url", exception.message ?: ""), ColorUtil.YELLOW)
             return
         }
         when {
@@ -279,7 +291,7 @@ class FeedbackScreen(private val parentScreen: Screen?) :
     }
 
     private fun startOAuthFlow(endpoint: FeedbackEndpoint) {
-        if (authSelector?.getValue() == AuthMode.LOCAL_CALLBACK) {
+        if (deviceFlowBox?.selected() != true) {
             startLocalCallbackFlow(endpoint)
         } else {
             startDeviceFlow(endpoint)
@@ -294,7 +306,7 @@ class FeedbackScreen(private val parentScreen: Screen?) :
 
         val client = minecraft
         val (deviceUrl, tokenUrl) = try { endpoint.oauthUrls() } catch (exception: IllegalArgumentException) {
-            setStatus(Component.literal(exception.message ?: "OAuth URL 无效"), ColorUtil.YELLOW)
+            setStatus(Component.translatable("screen.changelog363.feedback.oauth_invalid_url", exception.message ?: ""), ColorUtil.YELLOW)
             updateSubmitState()
             return
         }
@@ -350,7 +362,7 @@ class FeedbackScreen(private val parentScreen: Screen?) :
             return
         }
         val authorizationUrl = try { endpoint.oauthAuthorizationUrl() } catch (exception: IllegalArgumentException) {
-            setStatus(Component.literal(exception.message ?: "OAuth authorization URL 无效"), ColorUtil.YELLOW)
+            setStatus(Component.translatable("screen.changelog363.feedback.oauth_invalid_url", exception.message ?: ""), ColorUtil.YELLOW)
             loginState = LoginState.LOGIN_FAILED
             updateSubmitState()
             return
@@ -358,7 +370,7 @@ class FeedbackScreen(private val parentScreen: Screen?) :
         val flow = try {
             GitHubOAuth.startLocalServerFlow(endpoint.oauthClientId, endpoint.oauthClientSecret, authorizationUrl, tokenUrl)
         } catch (exception: Exception) {
-            setStatus(Component.literal("无法启动本地 OAuth 回调: ${errorText(exception)}"), ColorUtil.YELLOW)
+            setStatus(Component.translatable("screen.changelog363.feedback.local_callback_failed", errorText(exception)), ColorUtil.YELLOW)
             loginState = LoginState.LOGIN_FAILED
             updateSubmitState()
             return
@@ -394,11 +406,21 @@ class FeedbackScreen(private val parentScreen: Screen?) :
     }
 
     private fun updateAuthWidgets() {
-        val patMode = authSelector?.getValue() == AuthMode.PAT
+        var patMode = authSelector?.getValue() == AuthMode.PAT
+        val oauthAvailable = endpointSelector?.getValue()?.oauthEnabled == true
+        if (!oauthAvailable && !patMode) {
+            authSelector?.setValue(AuthMode.PAT)
+            patMode = true
+        }
+        val canChangeAuth = loginState != LoginState.LOGGING_IN
+        authSelector?.active = oauthAvailable && canChangeAuth
+        endpointSelector?.active = canChangeAuth
         patBox?.visible = patMode
         patBox?.active = patMode
         savePatBox?.visible = patMode
         savePatBox?.active = patMode
+        deviceFlowBox?.visible = !patMode && oauthAvailable
+        deviceFlowBox?.active = !patMode && oauthAvailable && canChangeAuth
         updateLoginStatus()
         updateSubmitState()
     }
@@ -428,6 +450,10 @@ class FeedbackScreen(private val parentScreen: Screen?) :
         val left = (width - PANEL_W) / 2
         graphics.fill(left, PANEL_TOP, left + PANEL_W, PANEL_BOTTOM, ROW_BACKGROUND)
         graphics.fill(left, PANEL_TOP, left + 4, PANEL_BOTTOM, ROW_ACCENT)
+        graphics.fill(left + SMALL_GAP, ENDPOINT_Y - 4, left + PANEL_W - SMALL_GAP, ENDPOINT_Y + 24, SECTION_BACKGROUND)
+        graphics.fill(left + SMALL_GAP, AUTH_Y - 4, left + PANEL_W - SMALL_GAP, PAT_Y + 24, SECTION_BACKGROUND)
+        graphics.fill(left + SMALL_GAP, TITLE_LABEL_Y - 6, left + PANEL_W - SMALL_GAP, CONTENT_BOX_Y + CONTENT_BOX_H + 4, FIELD_BACKGROUND)
+        graphics.fill(left + SMALL_GAP, CONTACT_LABEL_Y - 6, left + PANEL_W - SMALL_GAP, CONTACT_BOX_Y + CONTACT_BOX_H + 4, FIELD_BACKGROUND)
     }
 
     private fun drawLabels(graphics: GuiGraphicsExtractor) {

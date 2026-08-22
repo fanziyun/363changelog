@@ -9,6 +9,7 @@ class FeedbackEndpointTest {
         displayName = "Test",
         baseUrl = baseUrl,
         repo = repo,
+        oauthEnabled = true,
         oauthClientId = "client",
         oauthClientSecret = "",
         deviceCodeUrl = "https://github.com/login/device/code",
@@ -33,5 +34,10 @@ class FeedbackEndpointTest {
         val first = endpoint("https://api.github.com", "owner/one").storageKey()
         val second = endpoint("https://api.github.com", "owner/two").storageKey()
         assert(first != second)
+    }
+
+    @Test
+    fun `can represent PAT-only services`() {
+        assertEquals(false, endpoint().copy(oauthEnabled = false).oauthEnabled)
     }
 }
