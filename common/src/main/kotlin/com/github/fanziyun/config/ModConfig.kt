@@ -26,6 +26,9 @@ class ModConfig : ConfigData {
         @Comment("Whether this endpoint supports OAuth. Disable for PAT-only services.")
         var oauthEnabled: Boolean = true
 
+        @Comment("Force the OAuth device flow and hide the local-callback option. Keep enabled unless the endpoint really needs the authorization-code flow: that flow requires a client secret, which cannot be shipped to players safely.")
+        var oauthForceDeviceFlow: Boolean = true
+
         @Comment("OAuth device-flow client ID; leave blank to disable OAuth for this endpoint")
         var oauthClientId: String = "Ov23liAM2iYE4alTOVOj"
 

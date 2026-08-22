@@ -9,6 +9,7 @@ data class FeedbackEndpoint(
     val repo: String,
     val defaultPat: String,
     val oauthEnabled: Boolean,
+    val oauthForceDeviceFlow: Boolean,
     val oauthClientId: String,
     val oauthClientSecret: String,
     val deviceCodeUrl: String,
@@ -38,6 +39,17 @@ data class FeedbackEndpoint(
 
     fun oauthAuthorizationUrl(): String = validateOAuthUrl(authorizationUrl, "OAuth authorization URL")
 
+    /**
+     * 是否走设备流。[playerPrefersDeviceFlow] 是玩家在反馈界面里的勾选，
+     * 端点配置了 [oauthForceDeviceFlow] 时直接忽略它——本地回调流需要 client secret，
+     * 而 secret 一旦随配置分发给玩家就等于公开泄露。
+     */
+    fun usesDeviceFlow(playerPrefersDeviceFlow: Boolean): Boolean =
+        oauthForceDeviceFlow || playerPrefersDeviceFlow
+
+    /** 玩家能否自己挑登录方式：只有启用 OAuth 且没被强制设备流的端点才给选择。 */
+    fun allowsFlowChoice(): Boolean = oauthEnabled && !oauthForceDeviceFlow
+
     fun storageKey(): String = listOf(baseUrl.trim().trimEnd('/'), repo.trim().trim('/')).joinToString("|")
 
     companion object {
@@ -47,6 +59,7 @@ data class FeedbackEndpoint(
             repo = config.repo,
             defaultPat = config.defaultPat,
             oauthEnabled = config.oauthEnabled,
+            oauthForceDeviceFlow = config.oauthForceDeviceFlow,
             oauthClientId = config.oauthClientId,
             oauthClientSecret = config.oauthClientSecret,
             deviceCodeUrl = config.deviceCodeUrl,

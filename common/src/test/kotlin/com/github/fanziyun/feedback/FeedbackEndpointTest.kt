@@ -11,6 +11,7 @@ class FeedbackEndpointTest {
         repo = repo,
         defaultPat = "",
         oauthEnabled = true,
+        oauthForceDeviceFlow = false,
         oauthClientId = "client",
         oauthClientSecret = "",
         deviceCodeUrl = "https://github.com/login/device/code",
@@ -40,5 +41,25 @@ class FeedbackEndpointTest {
     @Test
     fun `can represent PAT-only services`() {
         assertEquals(false, endpoint().copy(oauthEnabled = false).oauthEnabled)
+    }
+
+    @Test
+    fun `player choice decides the OAuth flow only when the endpoint allows it`() {
+        val choosable = endpoint()
+        assertEquals(true, choosable.allowsFlowChoice())
+        assertEquals(true, choosable.usesDeviceFlow(playerPrefersDeviceFlow = true))
+        assertEquals(false, choosable.usesDeviceFlow(playerPrefersDeviceFlow = false))
+    }
+
+    @Test
+    fun `forcing the device flow overrides the player choice`() {
+        val forced = endpoint().copy(oauthForceDeviceFlow = true)
+        assertEquals(false, forced.allowsFlowChoice())
+        assertEquals(true, forced.usesDeviceFlow(playerPrefersDeviceFlow = false))
+    }
+
+    @Test
+    fun `PAT-only endpoints never offer a flow choice`() {
+        assertEquals(false, endpoint().copy(oauthEnabled = false).allowsFlowChoice())
     }
 }

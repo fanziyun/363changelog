@@ -302,10 +302,12 @@ class FeedbackScreen(private val parentScreen: Screen?) :
     }
 
     private fun startOAuthFlow(endpoint: FeedbackEndpoint) {
-        if (deviceFlowBox?.selected() != true) {
-            startLocalCallbackFlow(endpoint)
-        } else {
+        // 勾选框在强制设备流的端点上是隐藏的，而 Checkbox 没有写值的 API，
+        // 所以它可能还留着玩家在别的端点上取消勾选的旧值——由端点来拍板。
+        if (endpoint.usesDeviceFlow(deviceFlowBox?.selected() == true)) {
             startDeviceFlow(endpoint)
+        } else {
+            startLocalCallbackFlow(endpoint)
         }
     }
 
@@ -335,7 +337,15 @@ class FeedbackScreen(private val parentScreen: Screen?) :
                 }
 
                 deviceCode = code
-                setStatus(Component.translatable("screen.changelog363.feedback.login.await"), ColorUtil.LIGHT_GREY)
+                // 顺手把授权码放进剪贴板，玩家在浏览器里直接粘贴即可；剪贴板不可用时不影响登录
+                val copied = runCatching { client.keyboardHandler.setClipboard(code.userCode) }.isSuccess
+                setStatus(
+                    Component.translatable(
+                        if (copied) "screen.changelog363.feedback.login.await_copied"
+                        else "screen.changelog363.feedback.login.await"
+                    ),
+                    ColorUtil.LIGHT_GREY,
+                )
                 runCatching { ConfirmLinkScreen.confirmLinkNow(this, URI.create(code.verificationUri)) }
 
                 GitHubOAuth.pollForTokenAsync(endpoint.oauthClientId, tokenUrl, code.deviceCode, code.interval).whenComplete { token, pollError ->
@@ -418,11 +428,14 @@ class FeedbackScreen(private val parentScreen: Screen?) :
 
     private fun updateAuthWidgets() {
         var patMode = authSelector?.getValue() == AuthMode.PAT
-        val oauthAvailable = endpointSelector?.getValue()?.oauthEnabled == true
+        val endpoint = endpointSelector?.getValue()
+        val oauthAvailable = endpoint?.oauthEnabled == true
         if (!oauthAvailable && !patMode) {
             authSelector?.setValue(AuthMode.PAT)
             patMode = true
         }
+        // 强制设备流时不给玩家留选择，勾选框整个隐藏，避免显示一个点不动的开关
+        val flowChoosable = endpoint?.allowsFlowChoice() == true
         val canChangeAuth = loginState != LoginState.LOGGING_IN
         authSelector?.active = oauthAvailable && canChangeAuth
         endpointSelector?.active = canChangeAuth
@@ -430,8 +443,8 @@ class FeedbackScreen(private val parentScreen: Screen?) :
         patBox?.active = patMode
         savePatBox?.visible = patMode
         savePatBox?.active = patMode
-        deviceFlowBox?.visible = !patMode && oauthAvailable
-        deviceFlowBox?.active = !patMode && oauthAvailable && canChangeAuth
+        deviceFlowBox?.visible = !patMode && flowChoosable
+        deviceFlowBox?.active = !patMode && flowChoosable && canChangeAuth
         updateLoginStatus()
         updateSubmitState()
     }
@@ -506,7 +519,7 @@ class FeedbackScreen(private val parentScreen: Screen?) :
     /** 反馈界面通常从标题界面打开，此时 `minecraft.player` 还是 null，只有账号会话里才有玩家名。 */
     private fun resolvePlayerName(): String =
         minecraft.player?.name?.string?.takeIf(String::isNotBlank)
-            ?: minecraft.user?.name?.takeIf(String::isNotBlank)
+            ?: minecraft.user.name.takeIf(String::isNotBlank)
             ?: "Player"
 
     private fun buildFallbackTitle(packName: String, playerName: String, content: String): String {

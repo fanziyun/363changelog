@@ -45,8 +45,11 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 
 - **支持 GitHub/GitHub Enterprise 兼容 API**：每个反馈服务可配置自己的 API Base URL、仓库和显示名称。
 - **支持 OAuth 设备流和 PAT**：玩家在反馈界面选择鉴权方式；PAT 默认不保存，也可以选择保存到本地。
-  玩家首次提交时模组弹出一个授权码并打开浏览器，玩家在浏览器里用自己的 GitHub 账号确认后，模组轮询换到属于玩家本人的 token。
+  玩家首次提交时模组弹出一个授权码（同时尝试复制到剪贴板）并打开浏览器，玩家在浏览器里用自己的 GitHub 账号确认后，模组轮询换到属于玩家本人的 token。
   token 会缓存到本地（过期自动刷新），后续提交无需重复登录。
+- **默认强制设备流**：每个反馈服务的 `oauthForceDeviceFlow` 默认为 `true`，此时反馈界面里的「使用 Device Flow」开关会隐藏，
+  OAuth 登录只能走设备流。只有把它显式改成 `false` 才会出现开关、允许玩家改用本地回调（授权码流）——
+  而授权码流需要 `oauthClientSecret`，把 secret 随配置分发给玩家等于公开泄露，所以除非你的端点确实需要，否则不要关掉。
 - **目标仓库必须是公开仓库**：GitHub 文档「任何对仓库拥有 pull 权限的用户都能创建 issue」，公开仓库即所有登录用户，
   所以玩家用自己的账号就能在作者的公开仓库里开 issue。
 - **提交内容**：标题来自玩家填的「标题」字段（留空则自动生成 `[整合包名] 玩家名: 内容前30字`）；正文 = 内容 + 玩家名 + 整合包版本 + 联系方式。玩家昵称/版本信息自动附带。
@@ -85,9 +88,13 @@ On submit the mod posts it as a **GitHub issue** to the configured repo on a bac
 
 - **GitHub/GitHub Enterprise compatible APIs**: each feedback service can define its own API base URL, repository, and display name.
 - **OAuth Device Flow and PAT are supported**: players choose the authentication method in the feedback form; PAT storage is opt-in.
-  On a player's first submit the mod shows an authorization code and opens the browser; after the player confirms with their own
-  GitHub account, the mod polls for a token that belongs to that player. The token is cached locally (auto-refreshed when expired),
-  so later submissions need no re-login.
+  On a player's first submit the mod shows an authorization code (also copied to the clipboard) and opens the browser; after the player
+  confirms with their own GitHub account, the mod polls for a token that belongs to that player. The token is cached locally
+  (auto-refreshed when expired), so later submissions need no re-login.
+- **The device flow is forced by default**: `oauthForceDeviceFlow` defaults to `true` per feedback service, which hides the
+  "Use Device Flow" toggle in the form so OAuth can only use the device flow. Set it to `false` to expose the toggle and let players
+  pick the local-callback (authorization-code) flow instead — but that flow needs `oauthClientSecret`, and shipping a secret to
+  players leaks it publicly, so leave it on unless your endpoint truly requires it.
 - **The target repo must be public**: GitHub docs say "any user with pull access to a repository can create an issue", and a public
   repo gives every signed-in user pull access, so players can open issues on your public repo with their own account.
 - **Submitted content**: title comes from the "Title" field (auto-generated as `[packName] playerName: first-30-chars` if left blank);
