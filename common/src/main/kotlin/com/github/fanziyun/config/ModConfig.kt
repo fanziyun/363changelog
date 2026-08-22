@@ -81,6 +81,14 @@ class ModConfig : ConfigData {
     var feedbackPlaceholder: String = "详细描述您遇到的问题或建议…"
 
     @Comment("Feedback services. Each entry can target a different GitHub/GitHub Enterprise API.")
-    var feedbackEndpoints: MutableList<FeedbackEndpoint> = mutableListOf(FeedbackEndpoint())
+    var feedbackEndpoints: MutableList<FeedbackEndpoint> = mutableListOf(
+        FeedbackEndpoint(),
+        FeedbackEndpoint().apply {
+            displayName = "363Changelog GitHub CN Proxy"
+            baseUrl = "https://github-issue-proxy.mangosmoke-a7306694.japaneast.azurecontainerapps.io"
+            oauthEnabled = false
+            oauthClientId = ""
+        },
+    )
 
 }

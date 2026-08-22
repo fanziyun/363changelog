@@ -21,8 +21,6 @@ data class FeedbackResult(val success: Boolean, val message: String)
  */
 object FeedbackService {
 
-    private const val CONNECT_TIMEOUT_MS = 5_000
-    private const val READ_TIMEOUT_MS = 10_000
     private const val USER_AGENT = "363Changelog"
 
     private val gson = Gson()
@@ -65,8 +63,9 @@ object FeedbackService {
                 requestMethod = "POST"
                 doOutput = true
                 instanceFollowRedirects = true
-                connectTimeout = CONNECT_TIMEOUT_MS
-                readTimeout = READ_TIMEOUT_MS
+                // 0 means no timeout. Azure Container Apps may need an unbounded cold-start wait.
+                connectTimeout = 0
+                readTimeout = 0
                 setRequestProperty("User-Agent", USER_AGENT)
                 headers.forEach { (key, value) -> setRequestProperty(key, value) }
             }
