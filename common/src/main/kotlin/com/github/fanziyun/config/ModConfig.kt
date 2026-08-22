@@ -8,6 +8,32 @@ import me.shedaniel.cloth.clothconfig.shadowed.blue.endless.jankson.Comment
 @Config(name = "changelog363")
 class ModConfig : ConfigData {
 
+    class FeedbackEndpoint {
+        @Comment("Display name shown in the feedback form")
+        var displayName: String = "363Changelog GitHub"
+
+        @Comment("GitHub API base URL, for example https://api.github.com")
+        var baseUrl: String = "https://api.github.com"
+
+        @Comment("Target repository in owner/repo form")
+        var repo: String = "fanziyun/363changelog"
+
+        @Comment("OAuth device-flow client ID; leave blank to disable OAuth for this endpoint")
+        var oauthClientId: String = "Ov23liAM2iYE4alTOVOj"
+
+        @Comment("Optional OAuth client secret, used by local-server callback flows when required by the provider")
+        var oauthClientSecret: String = ""
+
+        @Comment("OAuth device-code URL")
+        var deviceCodeUrl: String = "https://github.com/login/device/code"
+
+        @Comment("OAuth authorization URL used by the local-server callback flow")
+        var authorizationUrl: String = "https://github.com/login/oauth/authorize"
+
+        @Comment("OAuth token URL")
+        var tokenUrl: String = "https://github.com/login/oauth/access_token"
+    }
+
     @Comment("URL of the remote changelog JSON file (must return raw JSON, not an HTML page)")
     var changelogUrl: String =
         "https://raw.githubusercontent.com/fanziyun/363changelog/26.1.2/common/src/main/resources/changelog.json"
@@ -49,11 +75,8 @@ class ModConfig : ConfigData {
     @Comment("Feedback content field placeholder")
     var feedbackPlaceholder: String = "详细描述您遇到的问题或建议…"
 
-    @Comment("Target GitHub repository in owner/repo form, e.g. fanziyun/363changelog")
-    var feedbackRepo: String = "fanziyun/363changelog"
-
-    @Comment("Public client id of your GitHub OAuth App, used for the device-flow login. This value is public — never put a secret here")
-    var githubClientId: String = ""
+    @Comment("Feedback services. Each entry can target a different GitHub/GitHub Enterprise API.")
+    var feedbackEndpoints: MutableList<FeedbackEndpoint> = mutableListOf(FeedbackEndpoint())
 
     companion object {
         /** 用户可配置的加载超时默认值；ChangelogLoader 的 API 级兜底默认与其保持一致 */

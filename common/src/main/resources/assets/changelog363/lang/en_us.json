@@ -72,8 +72,6 @@
   "text.autoconfig.changelog363.option.feedbackTitlePlaceholder.@Tooltip": "Placeholder text of the feedback title field",
   "text.autoconfig.changelog363.option.feedbackPlaceholder": "Content Placeholder",
   "text.autoconfig.changelog363.option.feedbackPlaceholder.@Tooltip": "Placeholder text of the feedback content field",
-  "text.autoconfig.changelog363.option.feedbackRepo": "Feedback Repo",
-  "text.autoconfig.changelog363.option.feedbackRepo.@Tooltip": "Target GitHub repo (owner/repo). It must be public so players can create issues with their own account",
-  "text.autoconfig.changelog363.option.githubClientId": "GitHub OAuth Client ID",
-  "text.autoconfig.changelog363.option.githubClientId.@Tooltip": "The client_id of your GitHub OAuth App (public value, used for the device-flow login). Never fill in the secret"
+  "text.autoconfig.changelog363.option.feedbackEndpoints": "Feedback Services",
+  "text.autoconfig.changelog363.option.feedbackEndpoints.@Tooltip": "Multiple feedback services, each with a display name, API base URL, repository, and OAuth settings"
 }

@@ -31,8 +31,7 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `feedbackTitle` | String | `"意见反馈"` | 反馈表单标题。 |
 | `feedbackTitlePlaceholder` | String | `"一句话概括您的问题"` | 反馈标题输入框的占位提示文本。 |
 | `feedbackPlaceholder` | String | `"详细描述您遇到的问题或建议…"` | 反馈内容输入框的占位提示文本。 |
-| `feedbackRepo` | String | `"fanziyun/363changelog"` | 反馈提交到的 GitHub 仓库（`owner/repo`）。**需为公开仓库**，玩家才能用自己的账号创建 issue。 |
-| `githubClientId` | String | `""` | 你在 GitHub 创建的 OAuth App 的 `client_id`（公开值），用于**设备流登录**。请勿填写 Secret。 |
+| `feedbackEndpoints` | List | 当前 GitHub 服务 | 反馈服务列表。每项配置显示名称、API Base URL、`owner/repo` 仓库，以及 OAuth 授权、Device、Token URL、Client ID 和可选 Secret。 |
 
 `changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/26.1.2/common/src/main/resources/changelog.json`
 
@@ -44,14 +43,14 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 更新日志总览界面底部有一个「反馈」按钮，点击打开游戏内反馈表单，玩家填写**标题 + 内容（+ 可选联系方式）**。
 提交后由模组在后台线程把反馈作为 **GitHub issue** 投递到配置的仓库，界面即时显示「登录中 / 发送中 / 成功 / 失败」。
 
-- **只面向 GitHub**：固定走 `api.github.com`，不切换到其它平台（GitHub API 对国际用户已足够快）。
-- **登录用 GitHub 设备流（Device Flow），不需要也不收集 PAT**：作者只需提供一个 GitHub **OAuth App** 的公开 `client_id`；
+- **支持 GitHub/GitHub Enterprise 兼容 API**：每个反馈服务可配置自己的 API Base URL、仓库和显示名称。
+- **支持 OAuth 设备流和 PAT**：玩家在反馈界面选择鉴权方式；PAT 默认不保存，也可以选择保存到本地。
   玩家首次提交时模组弹出一个授权码并打开浏览器，玩家在浏览器里用自己的 GitHub 账号确认后，模组轮询换到属于玩家本人的 token。
   token 会缓存到本地（过期自动刷新），后续提交无需重复登录。
 - **目标仓库必须是公开仓库**：GitHub 文档「任何对仓库拥有 pull 权限的用户都能创建 issue」，公开仓库即所有登录用户，
   所以玩家用自己的账号就能在作者的公开仓库里开 issue。
 - **提交内容**：标题来自玩家填的「标题」字段（留空则自动生成 `[整合包名] 玩家名: 内容前30字`）；正文 = 内容 + 玩家名 + 整合包版本 + 联系方式。玩家昵称/版本信息自动附带。
-- **作者需要配置**：`githubClientId`（GitHub OAuth App 的 Client ID，公开即可，无需保密）与 `feedbackRepo`（目标仓库）。
+- **反馈鉴权**：玩家可以选择 OAuth 设备流或 Personal Access Token；PAT 默认不保存，也可以在反馈界面选择保存到本地。
   未配置时玩家仍能打开表单，但提交会提示「联系作者」。
 
 > **安全说明**：token 属于玩家本人、只存本机，作者无需分发任何密钥，也无需在配置文件里放 PAT。
@@ -74,8 +73,7 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `feedbackTitle` | String | `"意见反馈"` | Feedback form title. |
 | `feedbackTitlePlaceholder` | String | `"一句话概括您的问题"` | Placeholder of the feedback title field. |
 | `feedbackPlaceholder` | String | `"详细描述您遇到的问题或建议…"` | Placeholder of the feedback content field. |
-| `feedbackRepo` | String | `"fanziyun/363changelog"` | Target GitHub repo (`owner/repo`). **Must be public** so players can create issues with their own account. |
-| `githubClientId` | String | `""` | The public `client_id` of your GitHub **OAuth App**, used for the **device-flow login**. Never fill in the secret. |
+| `feedbackEndpoints` | List | Current GitHub service | List of feedback services. Each item contains a display name, API base URL, `owner/repo`, OAuth authorization/device/token URLs, client ID, and optional secret. |
 
 Sources fall back in order: **remote URL → local cache → bundled `changelog.json`**, stopping at the first success.
 Remote requests send `If-None-Match`, so a 304 reuses the local cache.
@@ -85,8 +83,8 @@ Remote requests send `If-None-Match`, so a 304 reuses the local cache.
 The overview screen has a "Feedback" button that opens an in-game form where players enter a **title + content (+ optional contact)**.
 On submit the mod posts it as a **GitHub issue** to the configured repo on a background thread and shows "logging in / sending / success / failure".
 
-- **GitHub only**: it always uses `api.github.com` and does not switch to another platform — the GitHub API is fast enough for international users.
-- **Login via GitHub Device Flow — no PAT needed**: the author only provides the public `client_id` of a GitHub **OAuth App**.
+- **GitHub/GitHub Enterprise compatible APIs**: each feedback service can define its own API base URL, repository, and display name.
+- **OAuth Device Flow and PAT are supported**: players choose the authentication method in the feedback form; PAT storage is opt-in.
   On a player's first submit the mod shows an authorization code and opens the browser; after the player confirms with their own
   GitHub account, the mod polls for a token that belongs to that player. The token is cached locally (auto-refreshed when expired),
   so later submissions need no re-login.
@@ -94,7 +92,7 @@ On submit the mod posts it as a **GitHub issue** to the configured repo on a bac
   repo gives every signed-in user pull access, so players can open issues on your public repo with their own account.
 - **Submitted content**: title comes from the "Title" field (auto-generated as `[packName] playerName: first-30-chars` if left blank);
   body = content + player name + pack version + contact. Nickname and version are attached automatically.
-- **The author must set** `githubClientId` (public OAuth App Client ID — no secret) and `feedbackRepo` (target repo).
+- **Feedback authentication**: players can choose OAuth device flow or a Personal Access Token. PAT storage is opt-in in the feedback form.
   Without them the form still opens but submitting says to contact the author.
 
 > **Security note**: the token belongs to the player and stays on their machine — the author never distributes a secret and no PAT

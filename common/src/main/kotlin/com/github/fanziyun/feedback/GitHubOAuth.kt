@@ -5,8 +5,14 @@ import com.github.fanziyun.platform.Platform
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import java.net.HttpURLConnection
+import java.net.InetAddress
+import java.net.ServerSocket
 import java.net.URI
 import java.net.URLEncoder
+import java.net.URLDecoder
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -26,8 +32,6 @@ import java.util.concurrent.TimeoutException
  */
 object GitHubOAuth {
 
-    private const val DEVICE_CODE_URL = "https://github.com/login/device/code"
-    private const val TOKEN_URL = "https://github.com/login/oauth/access_token"
     private const val GRANT_TYPE_DEVICE = "urn:ietf:params:oauth:grant-type:device_code"
     private const val DEFAULT_SCOPE = "public_repo"
     private const val POLL_MAX_MS = 15 * 60 * 1000L
@@ -50,6 +54,11 @@ object GitHubOAuth {
         val expiresAt: Long,
     )
 
+    data class LocalServerFlow(
+        val authorizationUri: URI,
+        val tokenFuture: CompletableFuture<Token>,
+    )
+
     private val gson = Gson()
     private val executor = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "363Changelog-OAuth").apply { isDaemon = true }
@@ -59,17 +68,67 @@ object GitHubOAuth {
     }
 
     /** 异步请求 device code，交互期间用。 */
-    fun requestDeviceCodeAsync(clientId: String, scope: String = DEFAULT_SCOPE): CompletableFuture<DeviceCode> =
-        CompletableFuture.supplyAsync({ requestDeviceCode(clientId, scope) }, executor)
+    fun requestDeviceCodeAsync(clientId: String, deviceCodeUrl: String, scope: String = DEFAULT_SCOPE): CompletableFuture<DeviceCode> =
+        CompletableFuture.supplyAsync({ requestDeviceCode(clientId, deviceCodeUrl, scope) }, executor)
 
     /** 异步轮询换取 token（阻塞到玩家授权成功/失败/超时）。 */
-    fun pollForTokenAsync(clientId: String, deviceCode: String, interval: Int): CompletableFuture<Token> =
-        CompletableFuture.supplyAsync({ pollForToken(clientId, deviceCode, interval) }, executor)
+    fun pollForTokenAsync(clientId: String, tokenUrl: String, deviceCode: String, interval: Int): CompletableFuture<Token> =
+        CompletableFuture.supplyAsync({ pollForToken(clientId, tokenUrl, deviceCode, interval) }, executor)
+
+    /**
+     * Starts a loopback HTTP callback server for the regular OAuth authorization-code flow.
+     * Binding is local and immediate; waiting for the browser callback happens on the OAuth executor.
+     */
+    fun startLocalServerFlow(clientId: String, clientSecret: String, authorizationUrl: String, tokenUrl: String): LocalServerFlow {
+        val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
+        val state = java.util.UUID.randomUUID().toString()
+        val redirectUri = "http://127.0.0.1:${server.localPort}/callback"
+        val authorizationUri = URI.create(
+            appendQuery(
+                authorizationUrl,
+                mapOf(
+                    "client_id" to clientId,
+                    "redirect_uri" to redirectUri,
+                    "response_type" to "code",
+                    "scope" to DEFAULT_SCOPE,
+                    "state" to state,
+                ),
+            ),
+        )
+        val future = CompletableFuture.supplyAsync({
+            try {
+                server.soTimeout = POLL_MAX_MS.toInt()
+                server.accept().use { socket ->
+                    val reader = BufferedReader(InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII))
+                    val requestLine = reader.readLine().orEmpty()
+                    while (reader.readLine()?.isNotEmpty() == true) { /* consume headers */ }
+                    val target = requestLine.split(' ').getOrNull(1).orEmpty()
+                    val query = parseQuery(URI("http://127.0.0.1$target").rawQuery.orEmpty())
+                    val response = if (query["error"] != null) {
+                        "Authorization failed. You can close this window."
+                    } else {
+                        "Authorization complete. You can close this window."
+                    }
+                    OutputStreamWriter(socket.getOutputStream(), StandardCharsets.US_ASCII).use { writer ->
+                        writer.write("HTTP/1.1 200 OK\\r\\nContent-Type: text/plain; charset=utf-8\\r\\nContent-Length: ${response.toByteArray().size}\\r\\nConnection: close\\r\\n\\r\\n$response")
+                        writer.flush()
+                    }
+                    if (query["state"] != state) throw IllegalStateException("OAuth state 校验失败")
+                    val code = query["code"]?.takeIf(String::isNotBlank)
+                        ?: throw IllegalStateException(query["error_description"] ?: "OAuth 未返回 authorization code")
+                    exchangeAuthorizationCode(clientId, clientSecret, tokenUrl, code, redirectUri)
+                }
+            } finally {
+                server.close()
+            }
+        }, executor)
+        return LocalServerFlow(authorizationUri, future)
+    }
 
     /** 请求 device code，供界面展示给玩家。 */
-    fun requestDeviceCode(clientId: String, scope: String = DEFAULT_SCOPE): DeviceCode {
+    fun requestDeviceCode(clientId: String, deviceCodeUrl: String, scope: String = DEFAULT_SCOPE): DeviceCode {
         val body = urlEncoded(mapOf("client_id" to clientId, "scope" to scope))
-        val response = httpPost(DEVICE_CODE_URL, acceptJson = true, body)
+        val response = httpPost(deviceCodeUrl, acceptJson = true, body)
         val json = parseJson(response)
         return DeviceCode(
             deviceCode = json.required("device_code"),
@@ -82,7 +141,7 @@ object GitHubOAuth {
     /**
      * 轮询换取 access token。阻塞直到成功、失败或超时；玩家在浏览器确认前会一直循环。
      */
-    fun pollForToken(clientId: String, deviceCode: String, interval: Int): Token {
+    fun pollForToken(clientId: String, tokenUrl: String, deviceCode: String, interval: Int): Token {
         val deadline = System.currentTimeMillis() + POLL_MAX_MS
         var waitSeconds = interval.coerceAtLeast(5)
 
@@ -95,7 +154,7 @@ object GitHubOAuth {
                     "grant_type" to GRANT_TYPE_DEVICE,
                 ),
             )
-            val json = parseJson(httpPost(TOKEN_URL, acceptJson = true, body))
+            val json = parseJson(httpPost(tokenUrl, acceptJson = true, body))
 
             if (json.has("access_token")) return toToken(json)
 
@@ -111,38 +170,52 @@ object GitHubOAuth {
     }
 
     /** 用 refresh token 换新 access token。 */
-    fun refresh(clientId: String, refreshToken: String): Token {
+    fun refresh(clientId: String, tokenUrl: String, refreshToken: String): Token {
         val body = urlEncoded(
             mapOf("client_id" to clientId, "refresh_token" to refreshToken, "grant_type" to "refresh_token"),
         )
-        return toToken(parseJson(httpPost(TOKEN_URL, acceptJson = true, body)))
+        return toToken(parseJson(httpPost(tokenUrl, acceptJson = true, body)))
     }
 
-    fun load(): Token? = try {
-        if (!Files.isRegularFile(tokenPath)) null
-        else gson.fromJson(Files.readString(tokenPath, StandardCharsets.UTF_8), Token::class.java)
+    private fun exchangeAuthorizationCode(clientId: String, clientSecret: String, tokenUrl: String, code: String, redirectUri: String): Token {
+        val body = urlEncoded(
+            buildMap {
+                put("client_id", clientId)
+                put("code", code)
+                put("redirect_uri", redirectUri)
+                if (clientSecret.isNotBlank()) put("client_secret", clientSecret)
+            },
+        )
+        return toToken(parseJson(httpPost(tokenUrl, acceptJson = true, body)))
+    }
+
+    fun load(storageKey: String): Token? = try {
+        val path = tokenPath(storageKey)
+        if (!Files.isRegularFile(path)) null
+        else gson.fromJson(Files.readString(path, StandardCharsets.UTF_8), Token::class.java)
     } catch (_: Exception) {
         null
     }
 
-    fun save(token: Token) {
+    fun save(storageKey: String, token: Token) {
         try {
-            Files.createDirectories(tokenPath.parent)
-            val temp = Files.createTempFile(tokenPath.parent, "github_token", ".tmp")
+            val path = tokenPath(storageKey)
+            Files.createDirectories(path.parent)
+            val temp = Files.createTempFile(path.parent, "github_token", ".tmp")
             Files.writeString(temp, gson.toJson(token), StandardCharsets.UTF_8)
             try {
-                Files.move(temp, tokenPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                Files.move(temp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
             } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-                Files.move(temp, tokenPath, StandardCopyOption.REPLACE_EXISTING)
+                Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING)
             }
         } catch (exception: Exception) {
             Changelog.LOGGER.warn("Failed to persist GitHub login token", exception)
         }
     }
 
-    fun clear() {
+    fun clear(storageKey: String) {
         try {
-            Files.deleteIfExists(tokenPath)
+            Files.deleteIfExists(tokenPath(storageKey))
         } catch (_: Exception) {
             // ignore
         }
@@ -156,11 +229,18 @@ object GitHubOAuth {
         !isUsable(token) && !token.refreshToken.isNullOrBlank()
 
     /** 仅读本地文件判断是否已有一个可用（或可刷新）的会话，绝不触发网络。 */
-    fun hasSession(): Boolean = load()?.let { isUsable(it) || needsRefresh(it) } == true
+    fun hasSession(storageKey: String): Boolean = load(storageKey)?.let { isUsable(it) || needsRefresh(it) } == true
 
     /** 后台刷新 token（过期且有 refresh token 时用，避免渲染线程阻塞）。 */
-    fun refreshAsync(clientId: String, refreshToken: String): CompletableFuture<Token> =
-        CompletableFuture.supplyAsync({ refresh(clientId, refreshToken) }, executor)
+    fun refreshAsync(clientId: String, tokenUrl: String, refreshToken: String): CompletableFuture<Token> =
+        CompletableFuture.supplyAsync({ refresh(clientId, tokenUrl, refreshToken) }, executor)
+
+    private fun tokenPath(storageKey: String): Path {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(storageKey.toByteArray(StandardCharsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        return tokenPath.parent.resolve("github_token_$digest.json")
+    }
 
     private fun toToken(json: JsonObject): Token {
         val access = json.remove("access_token")?.asString
@@ -220,4 +300,16 @@ object GitHubOAuth {
         params.entries.joinToString("&") { (key, value) ->
             URLEncoder.encode(key, StandardCharsets.UTF_8) + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8)
         }
+
+    private fun appendQuery(url: String, params: Map<String, String>): String =
+        url + (if (url.contains('?')) "&" else "?") + urlEncoded(params)
+
+    private fun parseQuery(query: String): Map<String, String> = query.split('&')
+        .filter { it.isNotBlank() }
+        .mapNotNull { item ->
+            val parts = item.split('=', limit = 2)
+            if (parts.size != 2) null
+            else URLDecoder.decode(parts[0], StandardCharsets.UTF_8) to URLDecoder.decode(parts[1], StandardCharsets.UTF_8)
+        }
+        .toMap()
 }

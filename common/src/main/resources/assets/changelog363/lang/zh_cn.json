@@ -72,8 +72,6 @@
   "text.autoconfig.changelog363.option.feedbackTitlePlaceholder.@Tooltip": "反馈标题输入框的占位提示文本",
   "text.autoconfig.changelog363.option.feedbackPlaceholder": "内容占位文本",
   "text.autoconfig.changelog363.option.feedbackPlaceholder.@Tooltip": "反馈内容输入框的占位提示文本",
-  "text.autoconfig.changelog363.option.feedbackRepo": "反馈仓库",
-  "text.autoconfig.changelog363.option.feedbackRepo.@Tooltip": "反馈提交到的 GitHub 仓库（owner/repo）。该仓库需为公开仓库，玩家才能用自己的账号创建 issue",
-  "text.autoconfig.changelog363.option.githubClientId": "GitHub OAuth Client ID",
-  "text.autoconfig.changelog363.option.githubClientId.@Tooltip": "你在 GitHub 创建的 OAuth App 的 client_id（公开值）。用于设备流登录，请勿填写 Secret"
+  "text.autoconfig.changelog363.option.feedbackEndpoints": "反馈服务列表",
+  "text.autoconfig.changelog363.option.feedbackEndpoints.@Tooltip": "可配置多个反馈服务，每项包含显示名称、API Base URL、仓库和 OAuth 设置"
 }
