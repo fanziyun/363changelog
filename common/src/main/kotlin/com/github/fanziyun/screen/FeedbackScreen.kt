@@ -56,7 +56,6 @@ class FeedbackScreen(private val parentScreen: Screen?) :
         const val ROW_BACKGROUND = 0x66000000
         const val SECTION_BACKGROUND = 0x33000000
         const val FIELD_BACKGROUND = 0x22000000
-        const val ROW_ACCENT = 0xFF55FF55.toInt() // ColorUtil.GREEN
     }
 
     private enum class LoginState { NOT_LOGGED, LOGGING_IN, LOGGED_IN, LOGIN_FAILED }
@@ -461,7 +460,6 @@ class FeedbackScreen(private val parentScreen: Screen?) :
     private fun drawPanel(graphics: GuiGraphicsExtractor) {
         val left = (width - PANEL_W) / 2
         graphics.fill(left, PANEL_TOP, left + PANEL_W, PANEL_BOTTOM, ROW_BACKGROUND)
-        graphics.fill(left, PANEL_TOP, left + 4, PANEL_BOTTOM, ROW_ACCENT)
         graphics.fill(left + SMALL_GAP, ENDPOINT_Y - 4, left + PANEL_W - SMALL_GAP, ENDPOINT_Y + 24, SECTION_BACKGROUND)
         graphics.fill(left + SMALL_GAP, AUTH_Y - 4, left + PANEL_W - SMALL_GAP, PAT_Y + 24, SECTION_BACKGROUND)
         graphics.fill(left + SMALL_GAP, TITLE_LABEL_Y - 6, left + PANEL_W - SMALL_GAP, CONTENT_BOX_Y + CONTENT_BOX_H + 4, FIELD_BACKGROUND)
