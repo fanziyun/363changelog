@@ -20,6 +20,9 @@ class ModConfig : ConfigData {
         @Comment("Target repository in owner/repo form")
         var repo: String = "fanziyun/363changelog"
 
+        @Comment("Optional PAT prefilled in the feedback form")
+        var defaultPat: String = ""
+
         @Comment("Whether this endpoint supports OAuth. Disable for PAT-only services.")
         var oauthEnabled: Boolean = true
 
@@ -88,6 +91,7 @@ class ModConfig : ConfigData {
             baseUrl = "https://github-issue-proxy.mangosmoke-a7306694.japaneast.azurecontainerapps.io"
             oauthEnabled = false
             oauthClientId = ""
+            defaultPat = "NO NEDD PAT"
         },
     )
 

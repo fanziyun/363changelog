@@ -9,6 +9,7 @@ class FeedbackEndpointTest {
         displayName = "Test",
         baseUrl = baseUrl,
         repo = repo,
+        defaultPat = "",
         oauthEnabled = true,
         oauthClientId = "client",
         oauthClientSecret = "",

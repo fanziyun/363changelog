@@ -77,6 +77,7 @@
   "text.autoconfig.changelog363.option.FeedbackEndpoint.displayName": "Display Name",
   "text.autoconfig.changelog363.option.FeedbackEndpoint.baseUrl": "API Base URL",
   "text.autoconfig.changelog363.option.FeedbackEndpoint.repo": "Feedback Repo",
+  "text.autoconfig.changelog363.option.FeedbackEndpoint.defaultPat": "Default PAT",
   "text.autoconfig.changelog363.option.FeedbackEndpoint.oauthEnabled": "Enable OAuth",
   "text.autoconfig.changelog363.option.FeedbackEndpoint.oauthClientId": "OAuth Client ID",
   "text.autoconfig.changelog363.option.FeedbackEndpoint.oauthClientSecret": "OAuth Client Secret",

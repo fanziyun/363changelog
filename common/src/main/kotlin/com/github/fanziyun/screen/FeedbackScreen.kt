@@ -104,7 +104,10 @@ class FeedbackScreen(private val parentScreen: Screen?) :
             endpointSelector = addRenderableWidget(
                 CycleButton.builder<FeedbackEndpoint>({ Component.literal(it.displayName.ifBlank { it.baseUrl }) }, configuredEndpoints[0])
                     .withValues(configuredEndpoints)
-                    .create(left + SMALL_GAP, ENDPOINT_Y, PANEL_W - SMALL_GAP * 2, 20, Component.translatable("screen.changelog363.feedback.service")) { _, _ -> updateAuthWidgets() }
+                    .create(left + SMALL_GAP, ENDPOINT_Y, PANEL_W - SMALL_GAP * 2, 20, Component.translatable("screen.changelog363.feedback.service")) { _, endpoint ->
+                        applyPatPreset(endpoint)
+                        updateAuthWidgets()
+                    }
             )
         }
         authSelector = addRenderableWidget(
@@ -193,6 +196,7 @@ class FeedbackScreen(private val parentScreen: Screen?) :
         )
 
         setInitialFocus(content)
+        applyPatPreset(endpointSelector?.getValue())
         updateLoginStatus()
         updateAuthWidgets()
         updateSubmitState()
@@ -255,6 +259,14 @@ class FeedbackScreen(private val parentScreen: Screen?) :
             }
             else -> startOAuthFlow(endpoint)
         }
+    }
+
+    private fun applyPatPreset(endpoint: FeedbackEndpoint?) {
+        val value = endpoint?.let {
+            PersonalAccessTokens.load(it.storageKey())?.takeIf(String::isNotBlank)
+                ?: it.defaultPat.trim().takeIf(String::isNotBlank)
+        }.orEmpty()
+        patBox?.setValue(value)
     }
 
     private fun doSubmit(token: GitHubOAuth.Token, endpoint: FeedbackEndpoint) {

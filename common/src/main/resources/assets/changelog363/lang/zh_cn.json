@@ -77,6 +77,7 @@
   "text.autoconfig.changelog363.option.FeedbackEndpoint.displayName": "显示名称",
   "text.autoconfig.changelog363.option.FeedbackEndpoint.baseUrl": "API Base URL",
   "text.autoconfig.changelog363.option.FeedbackEndpoint.repo": "反馈仓库",
+  "text.autoconfig.changelog363.option.FeedbackEndpoint.defaultPat": "默认 PAT",
   "text.autoconfig.changelog363.option.FeedbackEndpoint.oauthEnabled": "启用 OAuth",
   "text.autoconfig.changelog363.option.FeedbackEndpoint.oauthClientId": "OAuth Client ID",
   "text.autoconfig.changelog363.option.FeedbackEndpoint.oauthClientSecret": "OAuth Client Secret",
