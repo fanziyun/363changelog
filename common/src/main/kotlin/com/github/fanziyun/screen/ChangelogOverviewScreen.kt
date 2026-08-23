@@ -86,32 +86,34 @@ class ChangelogOverviewScreen(private val parentScreen: Screen?) :
     }
 
     private fun addNavigationButtons() {
-        val totalButtonWidth = 214
-        val buttonLeft = width / 2 - totalButtonWidth / 2
         val buttonY = height - 30
         val gap = 4
+        val buttonWidth = 100
 
         val config = ChangelogService.config
+        val buttons = mutableListOf<Pair<Component, () -> Unit>>()
+
         val linkName = config?.externalLinkName?.trim()?.takeIf(String::isNotEmpty)
         val linkUri = config?.externalLinkUrl?.let(::parseHttpUri)
         if (linkName != null && linkUri != null) {
-            val linkWidth = (totalButtonWidth - gap) / 3
+            buttons += Component.literal(linkName) to { ConfirmLinkScreen.confirmLinkNow(this, linkUri) }
+        }
+        if (config?.feedbackEnabled == true && !config.feedbackRepo.isBlank()) {
+            buttons += Component.translatable("screen.changelog363.feedback") to {
+                minecraft.setScreen(FeedbackScreen(this))
+            }
+        }
+        buttons += Component.translatable("gui.back") to { onClose() }
+
+        val totalWidth = buttons.size * buttonWidth + gap * (buttons.size - 1)
+        var buttonLeft = width / 2 - totalWidth / 2
+        for ((label, action) in buttons) {
             addRenderableWidget(
-                Button.builder(Component.literal(linkName)) { ConfirmLinkScreen.confirmLinkNow(this, linkUri) }
-                    .bounds(buttonLeft, buttonY, linkWidth, 20)
+                Button.builder(label) { action() }
+                    .bounds(buttonLeft, buttonY, buttonWidth, 20)
                     .build()
             )
-            addRenderableWidget(
-                Button.builder(Component.translatable("gui.back")) { onClose() }
-                    .bounds(buttonLeft + linkWidth + gap, buttonY, totalButtonWidth - gap - linkWidth, 20)
-                    .build()
-            )
-        } else {
-            addRenderableWidget(
-                Button.builder(Component.translatable("gui.back")) { onClose() }
-                    .bounds(buttonLeft, buttonY, totalButtonWidth, 20)
-                    .build()
-            )
+            buttonLeft += buttonWidth + gap
         }
     }
 

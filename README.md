@@ -27,11 +27,36 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `versionYOffset` | Int | `20` | 主菜单版本文字距屏幕底部的像素距离。 |
 | `externalLinkName` | String | `"项目主页"` | 外部链接按钮的显示名称。留空则不显示该按钮。 |
 | `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | 外部链接按钮的目标 URL。 |
+| `feedbackEnabled` | Boolean | `true` | 是否在更新日志总览界面显示「反馈」按钮。 |
+| `feedbackTitle` | String | `"意见反馈"` | 反馈表单标题。 |
+| `feedbackTitlePlaceholder` | String | `"一句话概括您的问题"` | 反馈标题输入框的占位提示文本。 |
+| `feedbackPlaceholder` | String | `"详细描述您遇到的问题或建议…"` | 反馈内容输入框的占位提示文本。 |
+| `feedbackRepo` | String | `"fanziyun/363changelog"` | 反馈提交到的 GitHub 仓库（`owner/repo`）。**需为公开仓库**，玩家才能用自己的账号创建 issue。 |
+| `githubClientId` | String | `""` | 你在 GitHub 创建的 OAuth App 的 `client_id`（公开值），用于**设备流登录**。请勿填写 Secret。 |
 
 `changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/26.1.2/common/src/main/resources/changelog.json`
 
 数据来源按 **远程 URL → 本地缓存 → 模组内置 changelog.json** 的顺序回退，任一环节成功即停止；
 远程请求会带 `If-None-Match`，命中 304 时直接复用本地缓存。
+
+### 反馈（Feedback）
+
+更新日志总览界面底部有一个「反馈」按钮，点击打开游戏内反馈表单，玩家填写**标题 + 内容（+ 可选联系方式）**。
+提交后由模组在后台线程把反馈作为 **GitHub issue** 投递到配置的仓库，界面即时显示「登录中 / 发送中 / 成功 / 失败」。
+
+- **只面向 GitHub**：固定走 `api.github.com`，不切换到其它平台（GitHub API 对国际用户已足够快）。
+- **登录用 GitHub 设备流（Device Flow），不需要也不收集 PAT**：作者只需提供一个 GitHub **OAuth App** 的公开 `client_id`；
+  玩家首次提交时模组弹出一个授权码并打开浏览器，玩家在浏览器里用自己的 GitHub 账号确认后，模组轮询换到属于玩家本人的 token。
+  token 会缓存到本地（过期自动刷新），后续提交无需重复登录。
+- **目标仓库必须是公开仓库**：GitHub 文档「任何对仓库拥有 pull 权限的用户都能创建 issue」，公开仓库即所有登录用户，
+  所以玩家用自己的账号就能在作者的公开仓库里开 issue。
+- **提交内容**：标题来自玩家填的「标题」字段（留空则自动生成 `[整合包名] 玩家名: 内容前30字`）；正文 = 内容 + 玩家名 + 整合包版本 + 联系方式。玩家昵称/版本信息自动附带。
+- **作者需要配置**：`githubClientId`（GitHub OAuth App 的 Client ID，公开即可，无需保密）与 `feedbackRepo`（目标仓库）。
+  未配置时玩家仍能打开表单，但提交会提示「联系作者」。
+
+> **安全说明**：token 属于玩家本人、只存本机，作者无需分发任何密钥，也无需在配置文件里放 PAT。
+> 当然 token 不进入任何人（包括作者）的配置，因此没有「把写 issue 权限交给客户端」的问题。
+> 设备流要求玩家有 GitHub 账号并在浏览器完成一次授权——如果希望「无 GitHub 账号也能反馈」，可改走自建/第三方反馈端点。
 
 ### English
 
@@ -45,9 +70,36 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `versionYOffset` | Int | `20` | Distance in pixels between the version text and the bottom of the title screen. |
 | `externalLinkName` | String | `"项目主页"` | Display name for the external link button. Leave blank to hide the button. |
 | `externalLinkUrl` | String | `"https://github.com/fanziyun/363changelog"` | Target URL for the external link button. |
+| `feedbackEnabled` | Boolean | `true` | Show the "Feedback" button on the changelog overview screen. |
+| `feedbackTitle` | String | `"意见反馈"` | Feedback form title. |
+| `feedbackTitlePlaceholder` | String | `"一句话概括您的问题"` | Placeholder of the feedback title field. |
+| `feedbackPlaceholder` | String | `"详细描述您遇到的问题或建议…"` | Placeholder of the feedback content field. |
+| `feedbackRepo` | String | `"fanziyun/363changelog"` | Target GitHub repo (`owner/repo`). **Must be public** so players can create issues with their own account. |
+| `githubClientId` | String | `""` | The public `client_id` of your GitHub **OAuth App**, used for the **device-flow login**. Never fill in the secret. |
 
 Sources fall back in order: **remote URL → local cache → bundled `changelog.json`**, stopping at the first success.
 Remote requests send `If-None-Match`, so a 304 reuses the local cache.
+
+### Feedback
+
+The overview screen has a "Feedback" button that opens an in-game form where players enter a **title + content (+ optional contact)**.
+On submit the mod posts it as a **GitHub issue** to the configured repo on a background thread and shows "logging in / sending / success / failure".
+
+- **GitHub only**: it always uses `api.github.com` and does not switch to another platform — the GitHub API is fast enough for international users.
+- **Login via GitHub Device Flow — no PAT needed**: the author only provides the public `client_id` of a GitHub **OAuth App**.
+  On a player's first submit the mod shows an authorization code and opens the browser; after the player confirms with their own
+  GitHub account, the mod polls for a token that belongs to that player. The token is cached locally (auto-refreshed when expired),
+  so later submissions need no re-login.
+- **The target repo must be public**: GitHub docs say "any user with pull access to a repository can create an issue", and a public
+  repo gives every signed-in user pull access, so players can open issues on your public repo with their own account.
+- **Submitted content**: title comes from the "Title" field (auto-generated as `[packName] playerName: first-30-chars` if left blank);
+  body = content + player name + pack version + contact. Nickname and version are attached automatically.
+- **The author must set** `githubClientId` (public OAuth App Client ID — no secret) and `feedbackRepo` (target repo).
+  Without them the form still opens but submitting says to contact the author.
+
+> **Security note**: the token belongs to the player and stays on their machine — the author never distributes a secret and no PAT
+> goes into the config. This avoids handing "create issue" rights to every client. The tradeoff is that players need a GitHub account
+> and one browser authorization; if you need feedback from players without GitHub, use a self-hosted/third-party feedback endpoint instead.
 
 ---
 

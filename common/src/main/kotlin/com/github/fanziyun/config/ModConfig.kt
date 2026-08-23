@@ -37,6 +37,24 @@ class ModConfig : ConfigData {
     @Comment("URL of the external link")
     var externalLinkUrl: String = "https://github.com/fanziyun/363changelog"
 
+    @Comment("Show the in-game feedback button on the changelog overview screen")
+    var feedbackEnabled: Boolean = true
+
+    @Comment("Feedback form title")
+    var feedbackTitle: String = "意见反馈"
+
+    @Comment("Feedback title field placeholder")
+    var feedbackTitlePlaceholder: String = "一句话概括您的问题"
+
+    @Comment("Feedback content field placeholder")
+    var feedbackPlaceholder: String = "详细描述您遇到的问题或建议…"
+
+    @Comment("Target GitHub repository in owner/repo form, e.g. fanziyun/363changelog")
+    var feedbackRepo: String = "fanziyun/363changelog"
+
+    @Comment("Public client id of your GitHub OAuth App, used for the device-flow login. This value is public — never put a secret here")
+    var githubClientId: String = ""
+
     companion object {
         /** 用户可配置的加载超时默认值；ChangelogLoader 的 API 级兜底默认与其保持一致 */
         const val DEFAULT_LOAD_TIMEOUT_SECONDS = 30
