@@ -1,6 +1,7 @@
 package com.github.fanziyun
 
 import com.github.fanziyun.config.ModConfig
+import com.github.fanziyun.config.DEFAULT_LOAD_TIMEOUT_SECONDS
 import com.github.fanziyun.data.ChangelogLoader
 import com.github.fanziyun.data.VersionChecker
 import me.shedaniel.autoconfig.AutoConfig
@@ -30,7 +31,7 @@ object ChangelogService {
         // 启动线程 / 渲染线程都不等待加载，游戏进标题界面、进世界都不会被 changelog 阻塞。
         Changelog.LOGGER.info(
             "363Changelog initialized — changelog load runs asynchronously on the '363Changelog-Loader' background thread and never blocks game entry; load timeout {}s",
-            config?.loadTimeoutSeconds ?: ModConfig.DEFAULT_LOAD_TIMEOUT_SECONDS,
+            config?.loadTimeoutSeconds ?: DEFAULT_LOAD_TIMEOUT_SECONDS,
         )
         ensureChangelogLoaded()
     }

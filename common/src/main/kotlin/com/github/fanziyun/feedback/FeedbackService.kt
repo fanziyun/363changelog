@@ -15,14 +15,12 @@ data class FeedbackResult(val success: Boolean, val message: String)
 /**
  * 反馈提交服务：在后台线程把反馈 POST 到 GitHub issues API。
  *
- * 只面向 GitHub（`https://api.github.com/repos/<owner>/<repo>/issues`），授权由
- * [GitHubOAuth] 设备流负责，token 属于玩家本人。与 [com.github.fanziyun.data.ChangelogLoader]
+ * 面向 GitHub/GitHub Enterprise 兼容 API，授权 token 可来自 [GitHubOAuth] 设备流或 PAT。
+ * 与 [com.github.fanziyun.data.ChangelogLoader]
  * 一样使用 JDK HttpURLConnection + 单线程 daemon 执行器，绝不阻塞渲染线程。
  */
 object FeedbackService {
 
-    private const val CONNECT_TIMEOUT_MS = 5_000
-    private const val READ_TIMEOUT_MS = 10_000
     private const val USER_AGENT = "363Changelog"
 
     private val gson = Gson()
@@ -31,25 +29,26 @@ object FeedbackService {
     }
 
     fun submit(
-        repo: String,
+        endpoint: FeedbackEndpoint,
         title: String,
         body: String,
         token: String,
     ): CompletableFuture<FeedbackResult> = CompletableFuture.supplyAsync({
-        val repoTrim = repo.trim().trim('/')
-        if (repoTrim.isBlank()) return@supplyAsync FeedbackResult(false, "反馈仓库未配置 (feedbackRepo)")
-        if (!repoTrim.contains('/')) return@supplyAsync FeedbackResult(false, "反馈仓库格式应为 owner/repo")
         if (token.isBlank()) return@supplyAsync FeedbackResult(false, "尚未登录 GitHub")
 
-        val url = "https://api.github.com/repos/$repoTrim/issues"
-        val headers = mapOf(
+        val url = try { endpoint.issueUrl() } catch (exception: IllegalArgumentException) {
+            return@supplyAsync FeedbackResult(false, exception.message ?: "反馈服务配置无效")
+        }
+        val headers = requestHeaders(token)
+        postJson(url, headers, jsonOf("title" to title, "body" to body))
+    }, executor)
+
+    internal fun requestHeaders(token: String): Map<String, String> = mapOf(
             "Authorization" to "Bearer $token",
             "Accept" to "application/vnd.github+json",
             "Content-Type" to "application/json",
             "X-GitHub-Api-Version" to "2022-11-28",
         )
-        postJson(url, headers, jsonOf("title" to title, "body" to body))
-    }, executor)
 
     private fun jsonOf(vararg pairs: Pair<String, String>): String {
         val obj = JsonObject()
@@ -64,8 +63,9 @@ object FeedbackService {
                 requestMethod = "POST"
                 doOutput = true
                 instanceFollowRedirects = true
-                connectTimeout = CONNECT_TIMEOUT_MS
-                readTimeout = READ_TIMEOUT_MS
+                // 0 means no timeout. Azure Container Apps may need an unbounded cold-start wait.
+                connectTimeout = 0
+                readTimeout = 0
                 setRequestProperty("User-Agent", USER_AGENT)
                 headers.forEach { (key, value) -> setRequestProperty(key, value) }
             }

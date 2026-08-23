@@ -5,8 +5,45 @@ import me.shedaniel.autoconfig.annotation.Config
 import me.shedaniel.autoconfig.annotation.ConfigEntry
 import me.shedaniel.cloth.clothconfig.shadowed.blue.endless.jankson.Comment
 
+const val DEFAULT_LOAD_TIMEOUT_SECONDS = 30
+
 @Config(name = "changelog363")
 class ModConfig : ConfigData {
+
+    class FeedbackEndpoint {
+        @Comment("Display name shown in the feedback form")
+        var displayName: String = "363Changelog GitHub"
+
+        @Comment("GitHub API base URL, for example https://api.github.com")
+        var baseUrl: String = "https://api.github.com"
+
+        @Comment("Target repository in owner/repo form")
+        var repo: String = "fanziyun/363changelog"
+
+        @Comment("Optional PAT prefilled in the feedback form")
+        var defaultPat: String = ""
+
+        @Comment("Whether this endpoint supports OAuth. Disable for PAT-only services.")
+        var oauthEnabled: Boolean = true
+
+        @Comment("Force the OAuth device flow and hide the local-callback option. Keep enabled unless the endpoint really needs the authorization-code flow: that flow requires a client secret, which cannot be shipped to players safely.")
+        var oauthForceDeviceFlow: Boolean = true
+
+        @Comment("OAuth device-flow client ID; leave blank to disable OAuth for this endpoint")
+        var oauthClientId: String = "Ov23liAM2iYE4alTOVOj"
+
+        @Comment("Optional OAuth client secret, used by local-server callback flows when required by the provider")
+        var oauthClientSecret: String = ""
+
+        @Comment("OAuth device-code URL")
+        var deviceCodeUrl: String = "https://github.com/login/device/code"
+
+        @Comment("OAuth authorization URL used by the local-server callback flow")
+        var authorizationUrl: String = "https://github.com/login/oauth/authorize"
+
+        @Comment("OAuth token URL")
+        var tokenUrl: String = "https://github.com/login/oauth/access_token"
+    }
 
     @Comment("URL of the remote changelog JSON file (must return raw JSON, not an HTML page)")
     var changelogUrl: String =
@@ -49,14 +86,16 @@ class ModConfig : ConfigData {
     @Comment("Feedback content field placeholder")
     var feedbackPlaceholder: String = "详细描述您遇到的问题或建议…"
 
-    @Comment("Target GitHub repository in owner/repo form, e.g. fanziyun/363changelog")
-    var feedbackRepo: String = "fanziyun/363changelog"
+    @Comment("Feedback services. Each entry can target a different GitHub/GitHub Enterprise API.")
+    var feedbackEndpoints: MutableList<FeedbackEndpoint> = mutableListOf(
+        FeedbackEndpoint(),
+        FeedbackEndpoint().apply {
+            displayName = "363Changelog GitHub CN Proxy"
+            baseUrl = "https://github-issue-proxy.mangosmoke-a7306694.japaneast.azurecontainerapps.io"
+            oauthEnabled = false
+            oauthClientId = ""
+            defaultPat = "NO NEDD PAT"
+        },
+    )
 
-    @Comment("Public client id of your GitHub OAuth App, used for the device-flow login. This value is public — never put a secret here")
-    var githubClientId: String = ""
-
-    companion object {
-        /** 用户可配置的加载超时默认值；ChangelogLoader 的 API 级兜底默认与其保持一致 */
-        const val DEFAULT_LOAD_TIMEOUT_SECONDS = 30
-    }
 }
