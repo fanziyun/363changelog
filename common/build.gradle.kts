@@ -16,6 +16,13 @@ dependencies {
     compileOnly("net.fabricmc:sponge-mixin:${rootProject.property("mixin_version")}")
     // 平台无关的 Cloth Config：ModConfig 上的注解与 AutoConfig 调用都来自它
     compileOnly("me.shedaniel.cloth:cloth-config:${rootProject.property("cloth_config_version")}")
+
+    testImplementation(kotlin("test-junit5"))
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 // common 只提供源码给 :fabric / :neoforge，自身不产出可用的模组 jar。
