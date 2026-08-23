@@ -8,6 +8,11 @@ gradle/gradle-daemon-jvm.properties
 # Gradle build folder
 build
 
+.dsh/
+.kotlin/
+.sc_active_version
+replay_pid*.log
+
 local.properties
 
 # IntelliJ

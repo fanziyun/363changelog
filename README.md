@@ -1,7 +1,7 @@
 # 363Changelog
 
 一个 Minecraft 模组，在主菜单与暂停界面展示整合包更新日志，支持远程获取与版本检测。
-**同时支持 Fabric 与 NeoForge**（Minecraft 26.1.2）。
+**同时支持 Fabric 与 NeoForge**（Minecraft 1.21–1.21.11 与 26.1.2）。
 
 ## 安装 / Installation
 
@@ -21,7 +21,7 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 |------|------|--------|------|
 | `changelogUrl` | String | 见下方说明 | 远程 JSON 更新日志文件的 URL。**必须直接返回 JSON**（如 `raw.githubusercontent.com/...`），GitHub 的 `blob/` 网页链接返回的是 HTML，无法解析。 |
 | `packName` | String | `"363Changelog"` | 主菜单左下角显示的整合包名称。留空则只显示版本号。 |
-| `modpackVersion` | String | `"1.1.0"` | 当前整合包版本号，用于与更新日志中的最高版本对比。默认值与内置 [changelog.json](common/src/main/resources/changelog.json) 的最新条目保持一致。 |
+| `modpackVersion` | String | `"1.1.0"` | 当前整合包版本号，用于与更新日志中的最高版本对比。默认值与内置 [changelog.json](src/main/resources/changelog.json) 的最新条目保持一致。 |
 | `showOnTitle` | Boolean | `true` | 是否在主菜单和暂停界面显示"更新日志"按钮。 |
 | `enableVersionCheck` | Boolean | `true` | 是否启用自动版本检测，检测到新版本时显示提示。 |
 | `versionYOffset` | Int | `20` | 主菜单版本文字距屏幕底部的像素距离。 |
@@ -33,7 +33,7 @@ NeoForge 上从模组列表里的"配置"按钮进入 —— 两边是同一个�
 | `feedbackPlaceholder` | String | `"详细描述您遇到的问题或建议…"` | 反馈内容输入框的占位提示文本。 |
 | `feedbackEndpoints` | List | GitHub + CN Proxy | 反馈服务列表。默认包含 GitHub API 和 Azure 上的 CN Proxy；每项配置显示名称、API Base URL、`owner/repo` 仓库、是否启用 OAuth，以及 OAuth 设置。反馈提交不设网络超时，以允许容器冷启动。 |
 
-`changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/26.1.2/common/src/main/resources/changelog.json`
+`changelogUrl` 默认值：`https://raw.githubusercontent.com/fanziyun/363changelog/unified/multi-version/src/main/resources/changelog.json`
 
 数据来源按 **远程 URL → 本地缓存 → 模组内置 changelog.json** 的顺序回退，任一环节成功即停止；
 远程请求会带 `If-None-Match`，命中 304 时直接复用本地缓存。
@@ -163,7 +163,7 @@ On submit the mod posts it as a **GitHub issue** to the configured repo on a bac
 }
 ```
 
-完整示例文件：[changelog.json](common/src/main/resources/changelog.json)
+完整示例文件：[changelog.json](src/main/resources/changelog.json)
 
 ---
 
@@ -205,34 +205,35 @@ access_token 只保存在 `sessionStorage`，关闭标签页即失效。
 ### 项目结构
 
 ```
-common/     与加载器无关的全部代码：数据层、工具、两个界面、两个 mixin、配置类
-fabric/     Fabric 入口点 + ModMenu 集成 + Platform 实现
-neoforge/   NeoForge 入口点 + 配置界面注册 + Platform 实现
+src/main/kotlin/
+├── data/            JSON 解析、缓存、超时与刷新
+├── feedback/        反馈提交、OAuth Device Flow 和 PAT
+├── screen/          共享界面状态、布局与渲染辅助
+├── fabric/          Fabric 入口点、ModMenu 和 Platform 实现
+├── neoforge/        NeoForge 入口点和配置界面注册
+└── mixin/           标题/暂停入口以及冒烟测试钩子
 ```
 
-`common` 用 ModDevGradle 的 **NeoForm 模式**编译，只对着原版 Minecraft，不带任何加载器。
-两个加载器子项目**直接把 `common` 的源码编进各自的 jar**（`kotlin.srcDir`），
-不依赖 `common` 的产物 —— Minecraft 从 26.1 起不再混淆，两边引用的是同一套官方名字，
-所以共享源码不需要任何重映射中间层。
+构建使用 Stonecutter split buildscript。每个 Minecraft/loader 组合都是独立 Gradle 节点；
+共享业务代码不写版本条件，只有 `GuiGraphics`、渲染入口、鼠标事件和 Cloth Config 这类
+真实 API 断层用 Stonecutter 编译期条件处理。
 
-平台差异只有一处：[`Platform`](common/src/main/kotlin/com/github/fanziyun/platform/Platform.kt)
-接口的 `gameDir`（缓存目录），由各子项目通过 `META-INF/services` 注册实现。
-
-Mixin 也放在 `common`：Fabric 与 NeoForge 都内置 Fabric Mixin，
-两边各自在 `fabric.mod.json` / `neoforge.mods.toml` 里声明同一个 `changelog363.mixins.json`。
+1.21.x 产物输出 Java 21 字节码，26.1.2 输出 Java 25；所有节点的编译 toolchain 都使用 JDK 25。
 
 ### 常用命令
 
 ```bash
-./gradlew build                 # 构建两个 jar
-./gradlew :fabric:build         # 只构建 Fabric
-./gradlew :neoforge:build       # 只构建 NeoForge
-./gradlew :fabric:runClient     # 启动 Fabric 开发实例
-./gradlew :neoforge:runClient   # 启动 NeoForge 开发实例
-./gradlew clean                 # 清理构建产物
+./gradlew :1.21-fabric:buildAndCollect
+./gradlew :1.21-neoforge:buildAndCollect
+./gradlew :26.1.2-fabric:buildAndCollect
+./gradlew :26.1.2-neoforge:buildAndCollect
+
+./gradlew :1.21-fabric:smokeClient      # 启动客户端并执行内置界面冒烟
+xvfb-run -a ./gradlew :1.21-fabric:smokeClient
 ```
 
-产物分别在 `fabric/build/libs/` 与 `neoforge/build/libs/`。
+产物集中在 `build/dist/<minecraft>/<loader>/`。CI 会拆成 26 个矩阵任务，
+逐组合执行单元测试、打包和客户端冒烟，并要求日志中出现 `CHANGELOG363_SMOKE_OK`。
 
 > 首次构建会下载并反编译 Minecraft，耗时可能超过半小时，属正常现象。
 > 构建需要 JDK 25；本机没装的话 `settings.gradle.kts` 里的 foojay resolver 会自动下载。
@@ -243,15 +244,16 @@ Mixin 也放在 `common`：Fabric 与 NeoForge 都内置 Fabric Mixin，
 
 | 组件 | 版本 |
 |------|------|
-| Minecraft | 26.1.2 |
+| Minecraft | 1.21–1.21.11、26.1.2 |
+| Stonecutter | 0.9.7 |
 | Fabric Loom / ModDevGradle | 1.15.5 / 2.0.141 |
-| NeoForm（common 用） | 26.1.2-1 |
-| NeoForge | 26.1.2.87 |
+| 构建 JDK | 25 |
+| 1.21.x 产物字节码 | Java 21 |
+| 26.1.2 产物字节码 | Java 25 |
 | Kotlin | 2.3.21 |
 
-> Kotlin for Forge 6.2.0 内置的 Kotlin 标准库是 **2.3.10**，而本项目用 2.3.21 编译。
-> 同一 minor 内标准库 API 兼容，本模组也只用了长期稳定的 API，所以没问题；
-> 但如果将来用到 2.3.11+ 才引入的标准库 API，就需要换用绑定了对应版本的语言提供者。
+> 1.21.8 及更早版本使用 Kotlin for Forge 5.12.0；1.21.9 及更新版本使用 6.3.0。
+> 项目使用 Kotlin 2.3.21 编译，运行时语言提供者由对应 Kotlin for Forge 版本带来。
 
 ### Changelog 编辑器
 
